@@ -1,4 +1,4 @@
-const cacheName = 'promptflow-cache-v1'
+const cacheName = 'promptflow-cache-v2'
 const appShell = ['./', './index.html', './manifest.webmanifest', './pwa-icon.svg']
 
 self.addEventListener('install', (event) => {
@@ -17,6 +17,22 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET' || event.request.url.startsWith('blob:')) {
+    return
+  }
+
+  if (event.request.mode === 'navigate' || event.request.destination === 'document') {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response.ok && new URL(event.request.url).origin === self.location.origin) {
+            const clone = response.clone()
+            caches.open(cacheName).then((cache) => cache.put(event.request, clone))
+          }
+
+          return response
+        })
+        .catch(() => caches.match(event.request).then((cached) => cached ?? caches.match('./index.html'))),
+    )
     return
   }
 

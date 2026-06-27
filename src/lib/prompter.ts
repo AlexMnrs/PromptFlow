@@ -78,12 +78,82 @@ export function findBestLineIndex(lines: string[], transcript: string, currentIn
   return bestScore >= 0.34 ? bestIndex : currentIndex
 }
 
+export function findVoiceTargetLine(lines: string[], transcript: string, currentIndex: number) {
+  const bestIndex = findBestLineIndex(lines, transcript, currentIndex)
+  const currentProgress = getLineVoiceProgress(lines[currentIndex] ?? '', transcript)
+
+  if (bestIndex > currentIndex) {
+    return bestIndex
+  }
+
+  if (currentIndex < lines.length - 1 && shouldAdvanceFromLine(currentProgress)) {
+    return currentIndex + 1
+  }
+
+  return bestIndex
+}
+
+export function getLineVoiceProgress(line: string, transcript: string) {
+  const lineWords = extractWordTokens(line).map((token) => normalizeText(token))
+  const transcriptWords = normalizeText(transcript).split(/\s+/).filter(Boolean).slice(-60)
+  const transcriptSet = new Set(transcriptWords)
+  const matchedIndexes = new Set<number>()
+
+  lineWords.forEach((word, index) => {
+    if (word && transcriptSet.has(word)) {
+      matchedIndexes.add(index)
+    }
+  })
+
+  const meaningfulWords = lineWords.filter((word) => word.length > 2)
+  const meaningfulMatches = lineWords.reduce((count, word, index) => count + (word.length > 2 && matchedIndexes.has(index) ? 1 : 0), 0)
+  const coverage = meaningfulWords.length === 0 ? 0 : meaningfulMatches / meaningfulWords.length
+  const trailingMatched = countTrailingMatches(lineWords, matchedIndexes)
+
+  return {
+    coverage,
+    matchedIndexes,
+    trailingMatched,
+    wordCount: lineWords.length,
+  }
+}
+
+export function extractWordTokens(line: string) {
+  return line.match(/[\p{L}\p{N}]+/gu) ?? []
+}
+
 function buildWordWindows(words: string[], size: number) {
   if (words.length < size || size < 2) {
     return []
   }
 
   return words.slice(0, -size + 1).map((_, index) => words.slice(index, index + size).join(' '))
+}
+
+function shouldAdvanceFromLine(progress: ReturnType<typeof getLineVoiceProgress>) {
+  if (progress.wordCount <= 3) {
+    return progress.coverage >= 0.67
+  }
+
+  return progress.coverage >= 0.62 || (progress.coverage >= 0.45 && progress.trailingMatched >= 3)
+}
+
+function countTrailingMatches(words: string[], matchedIndexes: Set<number>) {
+  let count = 0
+
+  for (let index = words.length - 1; index >= 0; index -= 1) {
+    if (words[index].length <= 2) {
+      continue
+    }
+
+    if (!matchedIndexes.has(index)) {
+      break
+    }
+
+    count += 1
+  }
+
+  return count
 }
 
 export function clamp(value: number, min: number, max: number) {

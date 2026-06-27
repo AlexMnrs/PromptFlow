@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { findBestLineIndex, normalizeText } from '../lib/prompter'
+import { findVoiceTargetLine, normalizeText } from '../lib/prompter'
 
 type SpeechStatus = 'idle' | 'listening' | 'paused' | 'unsupported' | 'error'
 
@@ -24,6 +24,7 @@ export function useSpeechFollower({
 }: SpeechFollowerOptions) {
   const [status, setStatus] = useState<SpeechStatus>('idle')
   const [transcript, setTranscript] = useState('')
+  const [matchingTranscript, setMatchingTranscript] = useState('')
   const [error, setError] = useState('')
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const shouldListenRef = useRef(false)
@@ -70,6 +71,7 @@ export function useSpeechFollower({
         restartTimerRef.current = null
       }
       transcriptBufferRef.current = ''
+      setMatchingTranscript('')
       recognitionRef.current?.stop()
       setStatus('paused')
       return
@@ -173,7 +175,8 @@ export function useSpeechFollower({
       }
 
       const matchingTranscript = `${transcriptBufferRef.current} ${cleanSpoken}`.trim()
-      onLineMatchedRef.current(findBestLineIndex(linesRef.current, matchingTranscript, currentIndexRef.current))
+      setMatchingTranscript(matchingTranscript)
+      onLineMatchedRef.current(findVoiceTargetLine(linesRef.current, matchingTranscript, currentIndexRef.current))
     }
 
     try {
@@ -196,6 +199,7 @@ export function useSpeechFollower({
   return {
     status,
     transcript,
+    matchingTranscript,
     error,
   }
 }

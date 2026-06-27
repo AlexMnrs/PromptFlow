@@ -43,7 +43,7 @@ import { createScript, defaultSettings } from './data/defaults'
 import { useMediaController } from './hooks/useMediaController'
 import { useSpeechFollower } from './hooks/useSpeechFollower'
 import { useWakeLock } from './hooks/useWakeLock'
-import { clamp, estimateMinutes, fileNameForScript, formatDuration, splitScript } from './lib/prompter'
+import { clamp, estimateMinutes, fileNameForScript, formatDuration, getLineVoiceProgress, splitScript } from './lib/prompter'
 import { loadState, saveState } from './lib/storage'
 import type { AppState, AppView, PrompterSettings, SaveStatus, ScriptItem } from './types'
 
@@ -720,7 +720,7 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
           onStopMedia={stopMedia}
         />
 
-        <ScriptPane lines={lines} activeLine={activeLine} lineStep={settings.fontSize * settings.lineHeight + 20} onLineSelect={moveToLine} />
+        <ScriptPane lines={lines} activeLine={activeLine} lineStep={settings.fontSize * settings.lineHeight + 20} voiceTranscript={speech.matchingTranscript} onLineSelect={moveToLine} />
       </section>
 
       {showChrome && showReadingPanel && (
@@ -895,20 +895,51 @@ interface ScriptPaneProps {
   lines: string[]
   activeLine: number
   lineStep: number
+  voiceTranscript: string
   onLineSelect: (index: number) => void
 }
 
-function ScriptPane({ lines, activeLine, lineStep, onLineSelect }: ScriptPaneProps) {
+function ScriptPane({ lines, activeLine, lineStep, voiceTranscript, onLineSelect }: ScriptPaneProps) {
+  const activeVoiceProgress = useMemo(() => getLineVoiceProgress(lines[activeLine] ?? '', voiceTranscript), [activeLine, lines, voiceTranscript])
+
   return (
     <div className="script-pane" aria-label="Texto del prompter">
       <div className="script-track" style={{ transform: `translateY(calc(var(--active-offset) - ${activeLine * lineStep}px))` }}>
         {lines.map((line, index) => (
           <button key={`${line}-${index}`} type="button" className={`script-line ${index === activeLine ? 'is-active' : ''}`} onClick={() => onLineSelect(index)}>
-            {line}
+            {index === activeLine ? <HighlightedLine line={line} matchedIndexes={activeVoiceProgress.matchedIndexes} /> : line}
           </button>
         ))}
       </div>
     </div>
+  )
+}
+
+interface HighlightedLineProps {
+  line: string
+  matchedIndexes: Set<number>
+}
+
+function HighlightedLine({ line, matchedIndexes }: HighlightedLineProps) {
+  let wordIndex = 0
+
+  return (
+    <>
+      {line.split(/([\p{L}\p{N}]+)/gu).map((part, index) => {
+        if (!/^[\p{L}\p{N}]+$/u.test(part)) {
+          return part
+        }
+
+        const currentWordIndex = wordIndex
+        wordIndex += 1
+
+        return (
+          <span key={`${part}-${index}`} className={`script-word ${matchedIndexes.has(currentWordIndex) ? 'is-spoken' : ''}`}>
+            {part}
+          </span>
+        )
+      })}
+    </>
   )
 }
 

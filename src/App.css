@@ -638,6 +638,21 @@
   text-shadow: 0 2px 18px rgba(0, 0, 0, 0.44);
 }
 
+.script-word {
+  border-radius: 6px;
+  transition:
+    color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.script-word.is-spoken {
+  color: #061011;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent);
+  text-shadow: none;
+}
+
 .reading-panel {
   top: 96px;
   right: 14px;
