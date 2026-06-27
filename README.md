@@ -1,0 +1,41 @@
+# PromptFlow
+
+PromptFlow es una PWA de teleprompter pensada para iPhone. Permite preparar guiones, leer con texto grande, usar la camara como referencia, grabar la toma y activar seguimiento por voz cuando el navegador lo soporte.
+
+## Funciones
+
+- Biblioteca local de guiones con crear, duplicar, eliminar, importar y exportar texto.
+- Editor con autoguardado en `localStorage` y estimacion de duracion.
+- Prompter con modo overlay y modo split.
+- Cambio rapido de orden en split: texto/camara o camara/texto.
+- Controles de lectura: play/pausa, reinicio, linea anterior/siguiente, tamano, velocidad, idioma y zoom.
+- Camara con vista espejo y zoom por hardware cuando el navegador lo permita; si no, zoom de previsualizacion.
+- Grabacion con `MediaRecorder` y descarga de la toma.
+- Seguimiento por voz opcional con fallback manual.
+- Manifest y service worker para uso instalable/offline.
+
+## Requisitos de iPhone
+
+Camara, microfono, grabacion y reconocimiento de voz requieren contexto seguro. En produccion usa HTTPS. En desarrollo local, abre la app desde el equipo o mediante un tunel HTTPS si pruebas en el iPhone real.
+
+El soporte de voz depende del navegador. Si `SpeechRecognition` no esta disponible, la app mantiene controles manuales grandes para avanzar, retroceder y pausar.
+
+La grabacion guarda el stream de camara/microfono. El texto del prompter sirve como guia de lectura en pantalla.
+
+## Desarrollo
+
+```bash
+npm install
+npm run dev
+```
+
+## Build
+
+```bash
+npm run build
+npm run preview
+```
+
+## Despliegue
+
+El workflow `.github/workflows/deploy-pages.yml` compila la app y publica `dist/` en GitHub Pages cuando hay push a `main`.

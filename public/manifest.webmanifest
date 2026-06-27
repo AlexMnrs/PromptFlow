@@ -1,0 +1,18 @@
+{
+  "name": "PromptFlow",
+  "short_name": "PromptFlow",
+  "description": "Prompter movil con camara, grabacion y seguimiento por voz opcional.",
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#07090c",
+  "theme_color": "#07090c",
+  "icons": [
+    {
+      "src": "./pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

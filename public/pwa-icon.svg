@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="PromptFlow">
+  <rect width="512" height="512" rx="92" fill="#07090c"/>
+  <path d="M118 153c0-30.9 25.1-56 56-56h164c30.9 0 56 25.1 56 56v206c0 30.9-25.1 56-56 56H174c-30.9 0-56-25.1-56-56V153Z" fill="#101820" stroke="#6ee7e1" stroke-width="18"/>
+  <path d="M177 173h158M177 224h158M177 275h111" stroke="#f5f8fb" stroke-width="28" stroke-linecap="round"/>
+  <circle cx="336" cy="324" r="41" fill="#ff5f6f"/>
+  <path d="M322 302v44l36-22-36-22Z" fill="#07090c"/>
+</svg>
