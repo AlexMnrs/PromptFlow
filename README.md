@@ -39,6 +39,8 @@ npm run build
 npm run preview
 ```
 
-## Despliegue
+## GitHub
 
-El workflow `.github/workflows/deploy-pages.yml` compila la app y publica `dist/` en GitHub Pages cuando hay push a `main`.
+El workflow `.github/workflows/ci.yml` verifica lint y build en cada push a `main`.
+
+Para publicar la PWA con GitHub Pages, el repositorio debe admitir Pages. En repositorios privados puede requerir un plan compatible; en un repositorio publico se puede activar Pages con GitHub Actions y publicar `dist/`.
