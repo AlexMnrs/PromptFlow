@@ -31,43 +31,26 @@ export function normalizeText(value: string) {
 }
 
 export function findBestLineIndex(lines: string[], transcript: string, currentIndex: number) {
-  const transcriptWords = normalizeText(transcript).split(/\s+/).filter(Boolean).slice(-34)
+  const transcriptWords = toNormalizedWords(transcript).slice(-34)
 
   if (transcriptWords.length < 3) {
     return currentIndex
   }
 
-  const transcriptText = transcriptWords.join(' ')
-  const transcriptSet = new Set(transcriptWords)
   let bestIndex = currentIndex
   let bestScore = 0
-  const start = Math.max(0, currentIndex - 2)
-  const end = Math.min(lines.length - 1, currentIndex + 10)
+  const start = Math.max(0, currentIndex - 1)
+  const end = Math.min(lines.length - 1, currentIndex + 3)
 
   for (let index = start; index <= end; index += 1) {
-    const lineWords = normalizeText(lines[index]).split(/\s+/).filter((word) => word.length > 2)
+    const progress = getLineVoiceProgress(lines[index], transcript)
 
-    if (lineWords.length === 0) {
+    if (progress.wordCount === 0) {
       continue
     }
 
-    let hits = 0
-    let recency = 0
-
-    for (const word of lineWords) {
-      if (!transcriptSet.has(word)) {
-        continue
-      }
-
-      const position = transcriptWords.lastIndexOf(word)
-      hits += 1
-      recency += (position + 1) / transcriptWords.length
-    }
-
-    const windowBonus = buildWordWindows(lineWords, Math.min(5, lineWords.length)).some((window) => transcriptText.includes(window)) ? 0.32 : 0
-    const recencyBonus = hits > 0 ? (recency / hits) * 0.2 : 0
-    const progressBonus = index > currentIndex ? Math.min(index - currentIndex, 3) * 0.03 : 0
-    const score = hits / Math.min(lineWords.length, 8) + windowBonus + recencyBonus + progressBonus
+    const distancePenalty = Math.max(0, index - currentIndex) * 0.08
+    const score = progress.coverage + progress.trailingMatched * 0.04 - distancePenalty
 
     if (score > bestScore) {
       bestIndex = index
@@ -75,44 +58,42 @@ export function findBestLineIndex(lines: string[], transcript: string, currentIn
     }
   }
 
-  return bestScore >= 0.34 ? bestIndex : currentIndex
+  return bestScore >= 0.3 ? bestIndex : currentIndex
 }
 
 export function findVoiceTargetLine(lines: string[], transcript: string, currentIndex: number) {
-  const bestIndex = findBestLineIndex(lines, transcript, currentIndex)
   const currentProgress = getLineVoiceProgress(lines[currentIndex] ?? '', transcript)
+  const nextIndex = currentIndex + 1
+  const nextProgress = getLineVoiceProgress(lines[nextIndex] ?? '', transcript)
 
-  if (bestIndex > currentIndex) {
-    return bestIndex
+  if (nextIndex < lines.length && startsNextLine(nextProgress)) {
+    return nextIndex
   }
 
   if (currentIndex < lines.length - 1 && shouldAdvanceFromLine(currentProgress)) {
     return currentIndex + 1
   }
 
-  return bestIndex
+  return findBestLineIndex(lines, transcript, currentIndex)
 }
 
 export function getLineVoiceProgress(line: string, transcript: string) {
-  const lineWords = extractWordTokens(line).map((token) => normalizeText(token))
-  const transcriptWords = normalizeText(transcript).split(/\s+/).filter(Boolean).slice(-60)
-  const transcriptSet = new Set(transcriptWords)
+  const lineWords = toNormalizedWords(line)
+  const transcriptWords = toNormalizedWords(transcript).slice(-60)
+  const matchedWordCount = countOrderedPrefixMatches(lineWords, transcriptWords)
   const matchedIndexes = new Set<number>()
 
-  lineWords.forEach((word, index) => {
-    if (word && transcriptSet.has(word)) {
-      matchedIndexes.add(index)
-    }
-  })
+  for (let index = 0; index < matchedWordCount; index += 1) {
+    matchedIndexes.add(index)
+  }
 
-  const meaningfulWords = lineWords.filter((word) => word.length > 2)
-  const meaningfulMatches = lineWords.reduce((count, word, index) => count + (word.length > 2 && matchedIndexes.has(index) ? 1 : 0), 0)
-  const coverage = meaningfulWords.length === 0 ? 0 : meaningfulMatches / meaningfulWords.length
+  const coverage = lineWords.length === 0 ? 0 : matchedWordCount / lineWords.length
   const trailingMatched = countTrailingMatches(lineWords, matchedIndexes)
 
   return {
     coverage,
     matchedIndexes,
+    matchedWordCount,
     trailingMatched,
     wordCount: lineWords.length,
   }
@@ -122,20 +103,53 @@ export function extractWordTokens(line: string) {
   return line.match(/[\p{L}\p{N}]+/gu) ?? []
 }
 
-function buildWordWindows(words: string[], size: number) {
-  if (words.length < size || size < 2) {
-    return []
-  }
-
-  return words.slice(0, -size + 1).map((_, index) => words.slice(index, index + size).join(' '))
+function toNormalizedWords(value: string) {
+  return extractWordTokens(normalizeText(value)).filter(Boolean)
 }
 
 function shouldAdvanceFromLine(progress: ReturnType<typeof getLineVoiceProgress>) {
   if (progress.wordCount <= 3) {
-    return progress.coverage >= 0.67
+    return progress.coverage >= 1
   }
 
-  return progress.coverage >= 0.62 || (progress.coverage >= 0.45 && progress.trailingMatched >= 3)
+  return progress.coverage >= 0.82 || (progress.coverage >= 0.66 && progress.trailingMatched >= 4)
+}
+
+function startsNextLine(progress: ReturnType<typeof getLineVoiceProgress>) {
+  if (progress.wordCount === 0) {
+    return false
+  }
+
+  return progress.matchedWordCount >= Math.min(3, progress.wordCount) || progress.coverage >= 0.32
+}
+
+function countOrderedPrefixMatches(lineWords: string[], transcriptWords: string[]) {
+  let matched = 0
+
+  for (const transcriptWord of transcriptWords) {
+    if (matched >= lineWords.length) {
+      break
+    }
+
+    if (matchesLineWord(lineWords, matched, transcriptWord)) {
+      matched += 1
+      continue
+    }
+
+    if (matchesJoinedLineWords(lineWords, matched, transcriptWord)) {
+      matched += 2
+    }
+  }
+
+  return matched
+}
+
+function matchesLineWord(lineWords: string[], index: number, transcriptWord: string) {
+  return lineWords[index] === transcriptWord
+}
+
+function matchesJoinedLineWords(lineWords: string[], index: number, transcriptWord: string) {
+  return index + 1 < lineWords.length && `${lineWords[index]}${lineWords[index + 1]}` === transcriptWord
 }
 
 function countTrailingMatches(words: string[], matchedIndexes: Set<number>) {

@@ -29,13 +29,21 @@ export function useSpeechFollower({
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const shouldListenRef = useRef(false)
   const currentIndexRef = useRef(currentIndex)
+  const previousIndexRef = useRef(currentIndex)
   const linesRef = useRef(lines)
   const onLineMatchedRef = useRef(onLineMatched)
   const onCommandRef = useRef(onCommand)
   const restartTimerRef = useRef<number | null>(null)
+  const networkErrorCountRef = useRef(0)
   const transcriptBufferRef = useRef('')
 
   useEffect(() => {
+    if (previousIndexRef.current !== currentIndex) {
+      transcriptBufferRef.current = ''
+      setMatchingTranscript('')
+      previousIndexRef.current = currentIndex
+    }
+
     currentIndexRef.current = currentIndex
   }, [currentIndex])
 
@@ -83,6 +91,7 @@ export function useSpeechFollower({
     recognition.lang = language
     recognitionRef.current = recognition
     shouldListenRef.current = true
+    networkErrorCountRef.current = 0
 
     recognition.onstart = () => {
       setStatus('listening')
@@ -90,6 +99,17 @@ export function useSpeechFollower({
     }
 
     recognition.onerror = (event) => {
+      if (event.error === 'network') {
+        networkErrorCountRef.current += 1
+
+        if (networkErrorCountRef.current >= 3) {
+          shouldListenRef.current = false
+          setStatus('unsupported')
+          setError('El reconocimiento por voz no esta respondiendo en este navegador. Prueba Chrome o Edge para seguimiento automatico.')
+          return
+        }
+      }
+
       if (shouldListenRef.current && isRecoverableSpeechError(event.error)) {
         setStatus('listening')
         setError('')
@@ -152,23 +172,24 @@ export function useSpeechFollower({
 
       if (commandsEnabled) {
         const normalized = normalizeText(cleanSpoken)
+        const commandWordCount = normalized.split(/\s+/).filter(Boolean).length
 
-        if (/\b(siguiente|next)\b/.test(normalized)) {
+        if (commandWordCount <= 3 && /^(siguiente|linea siguiente|next)$/.test(normalized)) {
           onCommandRef.current('next')
           return
         }
 
-        if (/\b(anterior|atras|previous|back)\b/.test(normalized)) {
+        if (commandWordCount <= 3 && /^(anterior|atras|linea anterior|previous|back)$/.test(normalized)) {
           onCommandRef.current('previous')
           return
         }
 
-        if (/\b(reiniciar|inicio|reset)\b/.test(normalized)) {
+        if (commandWordCount <= 3 && /^(reiniciar|inicio|reset)$/.test(normalized)) {
           onCommandRef.current('reset')
           return
         }
 
-        if (/\b(pausa|pausar|pause)\b/.test(normalized)) {
+        if (commandWordCount <= 3 && /^(pausa|pausar|pause)$/.test(normalized)) {
           onCommandRef.current('pause')
           return
         }
