@@ -9,6 +9,7 @@ import {
   Import,
   Languages,
   Library,
+  MonitorUp,
   Mic,
   MicOff,
   Minus,
@@ -20,6 +21,7 @@ import {
   RotateCcw,
   Save,
   Settings,
+  Share2,
   SlidersHorizontal,
   Square,
   Sun,
@@ -36,6 +38,7 @@ import { IconButton } from './components/IconButton'
 import { createScript, defaultSettings } from './data/defaults'
 import { useMediaController } from './hooks/useMediaController'
 import { useSpeechFollower } from './hooks/useSpeechFollower'
+import { useWakeLock } from './hooks/useWakeLock'
 import { clamp, estimateMinutes, fileNameForScript, formatDuration, splitScript } from './lib/prompter'
 import { loadState, saveState } from './lib/storage'
 import type { AppState, AppView, PrompterSettings, SaveStatus, ScriptItem } from './types'
@@ -408,9 +411,13 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
   const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(null)
   const [elapsed, setElapsed] = useState(0)
   const [recordedUrl, setRecordedUrl] = useState('')
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null)
   const [recordedMime, setRecordedMime] = useState('')
   const [recordingError, setRecordingError] = useState('')
+  const [shareError, setShareError] = useState('')
+  const [keepAwake, setKeepAwake] = useState(true)
   const [zoomMode, setZoomMode] = useState<'hardware' | 'preview'>('preview')
+  const wakeLockStatus = useWakeLock(keepAwake && (isPlaying || isRecording))
   const progress = Math.round(((activeLine + 1) / lines.length) * 100)
 
   const moveToLine = useCallback(
@@ -525,6 +532,7 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: mimeType || 'video/webm' })
         const url = URL.createObjectURL(blob)
+        setRecordedBlob(blob)
         setRecordedUrl((currentUrl) => {
           if (currentUrl) {
             URL.revokeObjectURL(currentUrl)
@@ -538,7 +546,9 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
 
       recorder.start(1000)
       setRecordedUrl('')
+      setRecordedBlob(null)
       setRecordedMime(mimeType || 'video/webm')
+      setShareError('')
       setElapsed(0)
       setRecordingStartedAt(Date.now())
       setIsRecording(true)
@@ -557,9 +567,41 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
       return
     }
 
-    const extension = recordedMime.includes('mp4') ? 'mp4' : 'webm'
+    const extension = getRecordingExtension(recordedMime)
     downloadUrl(recordedUrl, fileNameForScript(script, extension))
   }, [recordedMime, recordedUrl, script])
+
+  const shareRecording = useCallback(async () => {
+    if (!recordedBlob) {
+      return
+    }
+
+    setShareError('')
+    const extension = getRecordingExtension(recordedMime)
+    const file = new File([recordedBlob], fileNameForScript(script, extension), {
+      type: recordedBlob.type || recordedMime || 'video/webm',
+    })
+
+    if (navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: script.title || 'Toma',
+          text: 'Toma grabada en PromptFlow',
+        })
+        return
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          return
+        }
+
+        setShareError('No se pudo abrir compartir. Descarga la toma como alternativa.')
+        return
+      }
+    }
+
+    setShareError('Compartir archivo no esta disponible en este navegador.')
+  }, [recordedBlob, recordedMime, script])
 
   return (
     <div
@@ -629,6 +671,27 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
         </label>
       </aside>
 
+      {recordedUrl && (
+        <section className="take-review" aria-label="Revision de toma">
+          <video src={recordedUrl} controls playsInline />
+          <div>
+            <strong>Toma lista</strong>
+            <span>{recordedMime || 'video'}</span>
+          </div>
+          <div className="take-actions">
+            <button className="secondary-action" type="button" onClick={downloadRecording}>
+              <Download aria-hidden="true" size={16} />
+              Descargar
+            </button>
+            <button className="primary-action" type="button" onClick={shareRecording}>
+              <Share2 aria-hidden="true" size={16} />
+              Compartir
+            </button>
+          </div>
+          {shareError && <p>{shareError}</p>}
+        </section>
+      )}
+
       <footer className="prompter-dock">
         <IconButton icon={isPlaying ? Pause : Play} label={isPlaying ? 'Pausar lectura' : 'Iniciar lectura'} active={isPlaying} onClick={() => setIsPlaying((current) => !current)} variant="solid" />
         <IconButton icon={RotateCcw} label="Reiniciar guion" onClick={() => moveToLine(0)} />
@@ -648,6 +711,7 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
         />
         <IconButton icon={RefreshCcw} label="Alternar espejo" active={settings.mirror} onClick={() => onSettingsChange({ mirror: !settings.mirror })} />
         <IconButton icon={isRecording ? Square : Video} label={isRecording ? 'Detener grabacion' : 'Grabar'} active={isRecording} variant={isRecording ? 'danger' : 'glass'} onClick={isRecording ? stopRecording : startRecording} />
+        <IconButton icon={MonitorUp} label="Mantener pantalla despierta" active={keepAwake} onClick={() => setKeepAwake((current) => !current)} />
         <IconButton icon={settings.theme === 'light' ? Moon : settings.theme === 'dark' ? Sun : Settings} label="Cambiar tema" onClick={() => onSettingsChange({ theme: nextTheme(settings.theme) })} />
       </footer>
 
@@ -658,7 +722,9 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
         </span>
         <span className="status-pill">{hasMic ? 'Micro activo' : 'Micro pendiente'}</span>
         <span className="status-pill">Zoom {zoomMode}</span>
+        <span className="status-pill">Pantalla {wakeLockText(wakeLockStatus)}</span>
         {recordingError && <span className="status-pill status-error">{recordingError}</span>}
+        {shareError && <span className="status-pill status-error">{shareError}</span>}
         {speech.error && <span className="status-pill status-error">{speech.error}</span>}
         {recordedUrl && (
           <button className="status-pill status-button" type="button" onClick={downloadRecording}>
@@ -749,6 +815,26 @@ function nextTheme(theme: PrompterSettings['theme']): PrompterSettings['theme'] 
 function pickRecordingMimeType() {
   const candidates = ['video/mp4;codecs=h264,aac', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
   return candidates.find((type) => MediaRecorder.isTypeSupported(type)) ?? ''
+}
+
+function getRecordingExtension(mimeType: string): 'mp4' | 'webm' {
+  return mimeType.includes('mp4') ? 'mp4' : 'webm'
+}
+
+function wakeLockText(status: string) {
+  if (status === 'active') {
+    return 'activa'
+  }
+
+  if (status === 'unsupported') {
+    return 'manual'
+  }
+
+  if (status === 'blocked') {
+    return 'bloqueada'
+  }
+
+  return 'lista'
 }
 
 function voiceStatusText(status: string) {

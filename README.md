@@ -11,6 +11,8 @@ PromptFlow es una PWA de teleprompter pensada para iPhone. Permite preparar guio
 - Controles de lectura: play/pausa, reinicio, linea anterior/siguiente, tamano, velocidad, idioma y zoom.
 - Camara con vista espejo y zoom por hardware cuando el navegador lo permita; si no, zoom de previsualizacion.
 - Grabacion con `MediaRecorder` y descarga de la toma.
+- Revision rapida de la toma grabada con opcion de compartir cuando el navegador lo permite.
+- Wake Lock opcional para mantener la pantalla despierta durante lectura o grabacion.
 - Seguimiento por voz opcional con fallback manual.
 - Manifest y service worker para uso instalable/offline.
 

@@ -404,6 +404,7 @@
 .prompter-topbar,
 .prompter-dock,
 .reading-panel,
+.take-review,
 .status-strip {
   position: absolute;
   z-index: 12;
@@ -651,6 +652,48 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+.take-review {
+  top: 96px;
+  left: 14px;
+  width: min(320px, calc(100vw - 28px));
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  color: white;
+  background: rgba(6, 9, 12, 0.72);
+  backdrop-filter: blur(18px);
+}
+
+.take-review video {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  background: #000000;
+}
+
+.take-review strong,
+.take-review span {
+  display: block;
+}
+
+.take-review span,
+.take-review p {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.take-review p {
+  margin: 0;
+}
+
+.take-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .prompter-dock {
   left: 14px;
   right: 14px;
@@ -788,6 +831,15 @@
     bottom: auto;
     width: 172px;
     max-height: 188px;
+    overflow: auto;
+  }
+
+  .take-review {
+    top: auto;
+    left: 14px;
+    bottom: calc(max(14px, env(safe-area-inset-bottom)) + 122px);
+    width: min(240px, calc(100vw - 28px));
+    max-height: 226px;
     overflow: auto;
   }
 
