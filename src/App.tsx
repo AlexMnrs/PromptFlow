@@ -25,6 +25,7 @@ import {
   SlidersHorizontal,
   Square,
   Sun,
+  SwitchCamera,
   Trash2,
   Type,
   Upload,
@@ -403,11 +404,14 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
-  const { stream, permission, error: mediaError, hasCamera, hasMic, requestMedia, stopMedia } = useMediaController(videoRef)
+  const pendingRecordingStreamRef = useRef<MediaStream | null>(null)
+  const lastFacingRef = useRef(settings.cameraFacing)
+  const { stream, permission, error: mediaError, hasCamera, hasMic, requestMedia, stopMedia } = useMediaController(videoRef, settings.cameraFacing)
   const lines = useMemo(() => splitScript(script.body), [script.body])
   const [activeLine, setActiveLine] = useState(() => clamp(script.lastPosition, 0, lines.length - 1))
   const [isPlaying, setIsPlaying] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
+  const [countdown, setCountdown] = useState(0)
   const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(null)
   const [elapsed, setElapsed] = useState(0)
   const [recordedUrl, setRecordedUrl] = useState('')
@@ -417,7 +421,7 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
   const [shareError, setShareError] = useState('')
   const [keepAwake, setKeepAwake] = useState(true)
   const [zoomMode, setZoomMode] = useState<'hardware' | 'preview'>('preview')
-  const wakeLockStatus = useWakeLock(keepAwake && (isPlaying || isRecording))
+  const wakeLockStatus = useWakeLock(keepAwake && (isPlaying || isRecording || countdown > 0))
   const progress = Math.round(((activeLine + 1) / lines.length) * 100)
 
   const moveToLine = useCallback(
@@ -463,6 +467,18 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
   }, [activeLine, onScriptPatch])
 
   useEffect(() => {
+    if (lastFacingRef.current === settings.cameraFacing) {
+      return
+    }
+
+    lastFacingRef.current = settings.cameraFacing
+
+    if (stream) {
+      void requestMedia()
+    }
+  }, [requestMedia, settings.cameraFacing, stream])
+
+  useEffect(() => {
     if (!isPlaying || settings.voiceFollow) {
       return undefined
     }
@@ -503,12 +519,85 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
       .catch(() => setZoomMode('preview'))
   }, [settings.zoom, stream])
 
+  const beginRecording = useCallback(
+    (liveStream: MediaStream) => {
+      try {
+        const mimeType = pickRecordingMimeType()
+        const recorder = mimeType ? new MediaRecorder(liveStream, { mimeType }) : new MediaRecorder(liveStream)
+        chunksRef.current = []
+        recorderRef.current = recorder
+
+        recorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            chunksRef.current.push(event.data)
+          }
+        }
+
+        recorder.onstop = () => {
+          const blob = new Blob(chunksRef.current, { type: mimeType || 'video/webm' })
+          const url = URL.createObjectURL(blob)
+          setRecordedBlob(blob)
+          setRecordedUrl((currentUrl) => {
+            if (currentUrl) {
+              URL.revokeObjectURL(currentUrl)
+            }
+            return url
+          })
+          setRecordedMime(blob.type)
+          setIsRecording(false)
+          setRecordingStartedAt(null)
+        }
+
+        recorder.start(1000)
+        pendingRecordingStreamRef.current = null
+        setRecordedUrl('')
+        setRecordedBlob(null)
+        setRecordedMime(mimeType || 'video/webm')
+        setShareError('')
+        setElapsed(0)
+        setRecordingStartedAt(Date.now())
+        setIsRecording(true)
+        setIsPlaying(true)
+      } catch (recordError) {
+        pendingRecordingStreamRef.current = null
+        setRecordingError(recordError instanceof Error ? recordError.message : 'No se pudo iniciar la grabacion.')
+      }
+    },
+    [],
+  )
+
+  useEffect(() => {
+    if (countdown <= 0) {
+      return undefined
+    }
+
+    const timer = window.setTimeout(() => {
+      if (countdown === 1) {
+        const liveStream = pendingRecordingStreamRef.current
+        setCountdown(0)
+
+        if (liveStream) {
+          beginRecording(liveStream)
+        } else {
+          setRecordingError('La camara o el microfono dejaron de estar disponibles.')
+        }
+
+        return
+      }
+
+      setCountdown((current) => current - 1)
+    }, 1000)
+
+    return () => window.clearTimeout(timer)
+  }, [beginRecording, countdown])
+
   const startRecording = useCallback(async () => {
     setRecordingError('')
-    const liveStream = stream ?? (await requestMedia())
+    setShareError('')
 
-    if (!liveStream) {
-      setRecordingError('Activa camara o microfono antes de grabar.')
+    if (countdown > 0) {
+      pendingRecordingStreamRef.current = null
+      setCountdown(0)
       return
     }
 
@@ -517,46 +606,16 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
       return
     }
 
-    try {
-      const mimeType = pickRecordingMimeType()
-      const recorder = mimeType ? new MediaRecorder(liveStream, { mimeType }) : new MediaRecorder(liveStream)
-      chunksRef.current = []
-      recorderRef.current = recorder
+    const liveStream = stream ?? (await requestMedia())
 
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          chunksRef.current.push(event.data)
-        }
-      }
-
-      recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: mimeType || 'video/webm' })
-        const url = URL.createObjectURL(blob)
-        setRecordedBlob(blob)
-        setRecordedUrl((currentUrl) => {
-          if (currentUrl) {
-            URL.revokeObjectURL(currentUrl)
-          }
-          return url
-        })
-        setRecordedMime(blob.type)
-        setIsRecording(false)
-        setRecordingStartedAt(null)
-      }
-
-      recorder.start(1000)
-      setRecordedUrl('')
-      setRecordedBlob(null)
-      setRecordedMime(mimeType || 'video/webm')
-      setShareError('')
-      setElapsed(0)
-      setRecordingStartedAt(Date.now())
-      setIsRecording(true)
-      setIsPlaying(true)
-    } catch (recordError) {
-      setRecordingError(recordError instanceof Error ? recordError.message : 'No se pudo iniciar la grabacion.')
+    if (!liveStream) {
+      setRecordingError('Activa camara o microfono antes de grabar.')
+      return
     }
-  }, [requestMedia, stream])
+
+    pendingRecordingStreamRef.current = liveStream
+    setCountdown(3)
+  }, [countdown, requestMedia, stream])
 
   const stopRecording = useCallback(() => {
     recorderRef.current?.stop()
@@ -634,6 +693,7 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
           mirror={settings.mirror}
           zoomMode={zoomMode}
           zoom={settings.zoom}
+          cameraFacing={settings.cameraFacing}
           onRequestMedia={requestMedia}
           onStopMedia={stopMedia}
         />
@@ -670,6 +730,12 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
           </select>
         </label>
       </aside>
+
+      {countdown > 0 && (
+        <div className="countdown-overlay" aria-live="assertive" aria-label={`Grabacion en ${countdown}`}>
+          <span>{countdown}</span>
+        </div>
+      )}
 
       {recordedUrl && (
         <section className="take-review" aria-label="Revision de toma">
@@ -709,8 +775,21 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
           label="Cambiar lado del split"
           onClick={() => onSettingsChange({ splitOrder: settings.splitOrder === 'script-first' ? 'camera-first' : 'script-first' })}
         />
+        <IconButton
+          icon={SwitchCamera}
+          label="Cambiar camara frontal o trasera"
+          active={settings.cameraFacing === 'environment'}
+          disabled={isRecording || countdown > 0}
+          onClick={() => onSettingsChange({ cameraFacing: settings.cameraFacing === 'user' ? 'environment' : 'user' })}
+        />
         <IconButton icon={RefreshCcw} label="Alternar espejo" active={settings.mirror} onClick={() => onSettingsChange({ mirror: !settings.mirror })} />
-        <IconButton icon={isRecording ? Square : Video} label={isRecording ? 'Detener grabacion' : 'Grabar'} active={isRecording} variant={isRecording ? 'danger' : 'glass'} onClick={isRecording ? stopRecording : startRecording} />
+        <IconButton
+          icon={isRecording || countdown > 0 ? Square : Video}
+          label={isRecording ? 'Detener grabacion' : countdown > 0 ? 'Cancelar cuenta atras' : 'Grabar'}
+          active={isRecording || countdown > 0}
+          variant={isRecording || countdown > 0 ? 'danger' : 'glass'}
+          onClick={isRecording ? stopRecording : startRecording}
+        />
         <IconButton icon={MonitorUp} label="Mantener pantalla despierta" active={keepAwake} onClick={() => setKeepAwake((current) => !current)} />
         <IconButton icon={settings.theme === 'light' ? Moon : settings.theme === 'dark' ? Sun : Settings} label="Cambiar tema" onClick={() => onSettingsChange({ theme: nextTheme(settings.theme) })} />
       </footer>
@@ -721,6 +800,8 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
           {speech.transcript ? `: ${speech.transcript.slice(0, 52)}` : ''}
         </span>
         <span className="status-pill">{hasMic ? 'Micro activo' : 'Micro pendiente'}</span>
+        <span className="status-pill">Camara {settings.cameraFacing === 'user' ? 'frontal' : 'trasera'}</span>
+        {countdown > 0 && <span className="status-pill status-countdown">Grabando en {countdown}</span>}
         <span className="status-pill">Zoom {zoomMode}</span>
         <span className="status-pill">Pantalla {wakeLockText(wakeLockStatus)}</span>
         {recordingError && <span className="status-pill status-error">{recordingError}</span>}
@@ -744,11 +825,12 @@ interface CameraPaneProps {
   mirror: boolean
   zoomMode: 'hardware' | 'preview'
   zoom: number
+  cameraFacing: 'user' | 'environment'
   onRequestMedia: () => Promise<MediaStream | null>
   onStopMedia: () => void
 }
 
-function CameraPane({ videoRef, hasCamera, permission, mediaError, mirror, zoomMode, zoom, onRequestMedia, onStopMedia }: CameraPaneProps) {
+function CameraPane({ videoRef, hasCamera, permission, mediaError, mirror, zoomMode, zoom, cameraFacing, onRequestMedia, onStopMedia }: CameraPaneProps) {
   return (
     <div className={`camera-pane ${mirror ? 'is-mirrored' : ''} ${zoomMode === 'preview' ? 'uses-preview-zoom' : ''}`} aria-label="Vista de camara">
       <video ref={videoRef} autoPlay playsInline muted />
@@ -769,7 +851,7 @@ function CameraPane({ videoRef, hasCamera, permission, mediaError, mirror, zoomM
         </button>
       )}
       <div className="camera-badge">
-        Vista {mirror ? 'espejo' : 'normal'} · {zoom.toFixed(1)}x
+        {cameraFacing === 'user' ? 'Frontal' : 'Trasera'} · Vista {mirror ? 'espejo' : 'normal'} · {zoom.toFixed(1)}x
       </div>
     </div>
   )

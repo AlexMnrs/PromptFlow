@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import type { CameraFacing } from '../types'
 
 export type MediaPermission = 'idle' | 'requesting' | 'ready' | 'partial' | 'blocked' | 'unsupported'
 
@@ -12,20 +13,22 @@ export interface MediaController {
   stopMedia: () => void
 }
 
-const cameraConstraints: MediaStreamConstraints = {
-  video: {
-    facingMode: 'user',
-    width: { ideal: 1920 },
-    height: { ideal: 1080 },
-  },
-  audio: {
-    echoCancellation: true,
-    noiseSuppression: true,
-    autoGainControl: true,
-  },
+function createMediaConstraints(facingMode: CameraFacing): MediaStreamConstraints {
+  return {
+    video: {
+      facingMode: { ideal: facingMode },
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+    },
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    },
+  }
 }
 
-export function useMediaController(videoRef: RefObject<HTMLVideoElement | null>): MediaController {
+export function useMediaController(videoRef: RefObject<HTMLVideoElement | null>, facingMode: CameraFacing): MediaController {
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [permission, setPermission] = useState<MediaPermission>('idle')
   const [error, setError] = useState('')
@@ -51,20 +54,21 @@ export function useMediaController(videoRef: RefObject<HTMLVideoElement | null>)
 
     setPermission('requesting')
     setError('')
+    const mediaConstraints = createMediaConstraints(facingMode)
 
     try {
-      const media = await navigator.mediaDevices.getUserMedia(cameraConstraints)
+      const media = await navigator.mediaDevices.getUserMedia(mediaConstraints)
       assignStream(media, 'ready')
       return media
     } catch (combinedError) {
       try {
-        const media = await navigator.mediaDevices.getUserMedia({ video: cameraConstraints.video })
+        const media = await navigator.mediaDevices.getUserMedia({ video: mediaConstraints.video })
         assignStream(media, 'partial')
         setError('Camara activa. El microfono no esta disponible para esta sesion.')
         return media
       } catch {
         try {
-          const media = await navigator.mediaDevices.getUserMedia({ audio: cameraConstraints.audio })
+          const media = await navigator.mediaDevices.getUserMedia({ audio: mediaConstraints.audio })
           assignStream(media, 'partial')
           setError('Microfono activo. La camara no esta disponible para esta sesion.')
           return media
@@ -75,7 +79,7 @@ export function useMediaController(videoRef: RefObject<HTMLVideoElement | null>)
         }
       }
     }
-  }, [assignStream])
+  }, [assignStream, facingMode])
 
   const stopMedia = useCallback(() => {
     assignStream(null, 'idle')

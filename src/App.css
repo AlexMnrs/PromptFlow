@@ -392,6 +392,11 @@
   background: var(--danger);
 }
 
+.icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 .prompter-stage {
   --line-step: calc(var(--prompter-font-size) * var(--prompter-line-height) + 20px);
   min-height: 100svh;
@@ -405,6 +410,7 @@
 .prompter-dock,
 .reading-panel,
 .take-review,
+.countdown-overlay,
 .status-strip {
   position: absolute;
   z-index: 12;
@@ -502,6 +508,7 @@
 
 .permission-card {
   position: absolute;
+  z-index: 16;
   inset: auto 18px 130px;
   max-width: 430px;
   margin: 0 auto;
@@ -694,6 +701,31 @@
   flex-wrap: wrap;
 }
 
+.countdown-overlay {
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  color: white;
+  background: rgba(0, 0, 0, 0.34);
+  pointer-events: none;
+}
+
+.countdown-overlay span {
+  width: 132px;
+  height: 132px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(5, 8, 10, 0.72);
+  box-shadow: 0 24px 90px rgba(0, 0, 0, 0.48);
+  color: var(--accent);
+  font-size: 74px;
+  font-weight: 850;
+  line-height: 1;
+}
+
 .prompter-dock {
   left: 14px;
   right: 14px;
@@ -736,6 +768,11 @@
 .status-listening {
   color: #061011;
   background: var(--accent);
+}
+
+.status-countdown {
+  color: #061011;
+  background: var(--accent-2);
 }
 
 .status-error {

@@ -24,6 +24,7 @@ export const defaultSettings: PrompterSettings = {
   overlayOpacity: 0.44,
   voiceFollow: true,
   voiceCommands: true,
+  cameraFacing: 'user',
 }
 
 export function createId() {

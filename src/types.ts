@@ -6,6 +6,8 @@ export type SplitOrder = 'script-first' | 'camera-first'
 
 export type ThemeMode = 'dark' | 'light' | 'contrast'
 
+export type CameraFacing = 'user' | 'environment'
+
 export type SaveStatus = 'Guardado' | 'Guardando' | 'Error'
 
 export interface ScriptItem {
@@ -31,6 +33,7 @@ export interface PrompterSettings {
   overlayOpacity: number
   voiceFollow: boolean
   voiceCommands: boolean
+  cameraFacing: CameraFacing
 }
 
 export interface AppState {
