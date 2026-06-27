@@ -32,16 +32,17 @@ export function normalizeText(value: string) {
 
 export function findBestLineIndex(lines: string[], transcript: string, currentIndex: number) {
   const transcriptWords = normalizeText(transcript).split(/\s+/).filter(Boolean).slice(-34)
-  const transcriptSet = new Set(transcriptWords)
 
   if (transcriptWords.length < 3) {
     return currentIndex
   }
 
+  const transcriptText = transcriptWords.join(' ')
+  const transcriptSet = new Set(transcriptWords)
   let bestIndex = currentIndex
   let bestScore = 0
   const start = Math.max(0, currentIndex - 2)
-  const end = Math.min(lines.length - 1, currentIndex + 8)
+  const end = Math.min(lines.length - 1, currentIndex + 10)
 
   for (let index = start; index <= end; index += 1) {
     const lineWords = normalizeText(lines[index]).split(/\s+/).filter((word) => word.length > 2)
@@ -50,9 +51,23 @@ export function findBestLineIndex(lines: string[], transcript: string, currentIn
       continue
     }
 
-    const hits = lineWords.reduce((score, word) => score + (transcriptSet.has(word) ? 1 : 0), 0)
-    const phraseBonus = transcriptWords.join(' ').includes(lineWords.slice(0, 4).join(' ')) ? 0.18 : 0
-    const score = hits / Math.min(lineWords.length, 10) + phraseBonus
+    let hits = 0
+    let recency = 0
+
+    for (const word of lineWords) {
+      if (!transcriptSet.has(word)) {
+        continue
+      }
+
+      const position = transcriptWords.lastIndexOf(word)
+      hits += 1
+      recency += (position + 1) / transcriptWords.length
+    }
+
+    const windowBonus = buildWordWindows(lineWords, Math.min(5, lineWords.length)).some((window) => transcriptText.includes(window)) ? 0.32 : 0
+    const recencyBonus = hits > 0 ? (recency / hits) * 0.2 : 0
+    const progressBonus = index > currentIndex ? Math.min(index - currentIndex, 3) * 0.03 : 0
+    const score = hits / Math.min(lineWords.length, 8) + windowBonus + recencyBonus + progressBonus
 
     if (score > bestScore) {
       bestIndex = index
@@ -60,7 +75,15 @@ export function findBestLineIndex(lines: string[], transcript: string, currentIn
     }
   }
 
-  return bestScore >= 0.38 ? bestIndex : currentIndex
+  return bestScore >= 0.34 ? bestIndex : currentIndex
+}
+
+function buildWordWindows(words: string[], size: number) {
+  if (words.length < size || size < 2) {
+    return []
+  }
+
+  return words.slice(0, -size + 1).map((_, index) => words.slice(index, index + size).join(' '))
 }
 
 export function clamp(value: number, min: number, max: number) {

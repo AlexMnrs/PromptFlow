@@ -5,6 +5,8 @@ import {
   Check,
   Copy,
   Download,
+  Eye,
+  EyeOff,
   FilePlus2,
   Import,
   Languages,
@@ -32,6 +34,7 @@ import {
   Video,
   VideoOff,
   Wand2,
+  X,
   ZoomIn,
 } from 'lucide-react'
 import './App.css'
@@ -420,6 +423,8 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
   const [recordingError, setRecordingError] = useState('')
   const [shareError, setShareError] = useState('')
   const [keepAwake, setKeepAwake] = useState(true)
+  const [showChrome, setShowChrome] = useState(true)
+  const [showReadingPanel, setShowReadingPanel] = useState(true)
   const [zoomMode, setZoomMode] = useState<'hardware' | 'preview'>('preview')
   const wakeLockStatus = useWakeLock(keepAwake && (isPlaying || isRecording || countdown > 0))
   const progress = Math.round(((activeLine + 1) / lines.length) * 100)
@@ -434,11 +439,11 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
   const handleVoiceCommand = useCallback(
     (command: 'next' | 'previous' | 'reset' | 'pause') => {
       if (command === 'next') {
-        moveToLine(activeLine + 1)
+        setActiveLine((current) => clamp(current + 1, 0, lines.length - 1))
       }
 
       if (command === 'previous') {
-        moveToLine(activeLine - 1)
+        setActiveLine((current) => clamp(current - 1, 0, lines.length - 1))
       }
 
       if (command === 'reset') {
@@ -449,7 +454,7 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
         setIsPlaying(false)
       }
     },
-    [activeLine, moveToLine],
+    [lines.length, moveToLine],
   )
 
   const speech = useSpeechFollower({
@@ -630,6 +635,19 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
     downloadUrl(recordedUrl, fileNameForScript(script, extension))
   }, [recordedMime, recordedUrl, script])
 
+  const dismissRecording = useCallback(() => {
+    setRecordedUrl((currentUrl) => {
+      if (currentUrl) {
+        URL.revokeObjectURL(currentUrl)
+      }
+
+      return ''
+    })
+    setRecordedBlob(null)
+    setRecordedMime('')
+    setShareError('')
+  }, [])
+
   const shareRecording = useCallback(async () => {
     if (!recordedBlob) {
       return
@@ -664,7 +682,7 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
 
   return (
     <div
-      className={`prompter-stage layout-${settings.layout} order-${settings.splitOrder}`}
+      className={`prompter-stage layout-${settings.layout} order-${settings.splitOrder} ${showChrome ? '' : 'chrome-hidden'}`}
       style={
         {
           '--prompter-font-size': `${settings.fontSize}px`,
@@ -681,8 +699,12 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
           <strong>{script.title || 'Sin titulo'}</strong>
           <span>{isRecording ? `Grabando ${formatDuration(elapsed)}` : `${progress}% leido`}</span>
         </div>
+        <IconButton icon={showReadingPanel ? SlidersHorizontal : Settings} label={showReadingPanel ? 'Ocultar ajustes' : 'Mostrar ajustes'} active={showReadingPanel} onClick={() => setShowReadingPanel((current) => !current)} />
+        <IconButton icon={EyeOff} label="Ocultar interfaz" onClick={() => setShowChrome(false)} />
         <div className={`record-dot ${isRecording ? 'is-live' : ''}`} aria-label={isRecording ? 'Grabacion activa' : 'Grabacion detenida'} />
       </header>
+
+      {!showChrome && <IconButton className="prompter-chrome-toggle" icon={Eye} label="Mostrar interfaz" onClick={() => setShowChrome(true)} variant="solid" />}
 
       <section className="stage-body" aria-label="Prompter">
         <CameraPane
@@ -701,35 +723,41 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
         <ScriptPane lines={lines} activeLine={activeLine} lineStep={settings.fontSize * settings.lineHeight + 20} onLineSelect={moveToLine} />
       </section>
 
-      <aside className="reading-panel" aria-label="Ajustes de lectura">
-        <label>
-          <Type aria-hidden="true" size={16} />
-          Texto
-          <input type="range" min="22" max="58" value={settings.fontSize} onChange={(event) => onSettingsChange({ fontSize: Number(event.target.value) })} />
-        </label>
-        <label>
-          <SlidersHorizontal aria-hidden="true" size={16} />
-          Velocidad
-          <input type="range" min="0.5" max="2.5" step="0.1" value={settings.speed} onChange={(event) => onSettingsChange({ speed: Number(event.target.value) })} />
-        </label>
-        <label>
-          <ZoomIn aria-hidden="true" size={16} />
-          Zoom {settings.zoom.toFixed(1)}x
-          <input type="range" min="1" max="3" step="0.1" value={settings.zoom} onChange={(event) => onSettingsChange({ zoom: Number(event.target.value) })} />
-        </label>
-        <label>
-          <Languages aria-hidden="true" size={16} />
-          Idioma
-          <select value={settings.language} onChange={(event) => onSettingsChange({ language: event.target.value })}>
-            <option value="es-ES">Espanol</option>
-            <option value="en-US">English</option>
-            <option value="fr-FR">Francais</option>
-            <option value="de-DE">Deutsch</option>
-            <option value="it-IT">Italiano</option>
-            <option value="pt-PT">Portugues</option>
-          </select>
-        </label>
-      </aside>
+      {showChrome && showReadingPanel && (
+        <aside className="reading-panel" aria-label="Ajustes de lectura">
+          <div className="reading-panel-header">
+            <span>Ajustes</span>
+            <IconButton icon={X} label="Cerrar ajustes" onClick={() => setShowReadingPanel(false)} />
+          </div>
+          <label>
+            <Type aria-hidden="true" size={16} />
+            Texto
+            <input type="range" min="22" max="58" value={settings.fontSize} onChange={(event) => onSettingsChange({ fontSize: Number(event.target.value) })} />
+          </label>
+          <label>
+            <SlidersHorizontal aria-hidden="true" size={16} />
+            Velocidad
+            <input type="range" min="0.5" max="2.5" step="0.1" value={settings.speed} onChange={(event) => onSettingsChange({ speed: Number(event.target.value) })} />
+          </label>
+          <label>
+            <ZoomIn aria-hidden="true" size={16} />
+            Zoom {settings.zoom.toFixed(1)}x
+            <input type="range" min="1" max="3" step="0.1" value={settings.zoom} onChange={(event) => onSettingsChange({ zoom: Number(event.target.value) })} />
+          </label>
+          <label>
+            <Languages aria-hidden="true" size={16} />
+            Idioma
+            <select value={settings.language} onChange={(event) => onSettingsChange({ language: event.target.value })}>
+              <option value="es-ES">Espanol</option>
+              <option value="en-US">English</option>
+              <option value="fr-FR">Francais</option>
+              <option value="de-DE">Deutsch</option>
+              <option value="it-IT">Italiano</option>
+              <option value="pt-PT">Portugues</option>
+            </select>
+          </label>
+        </aside>
+      )}
 
       {countdown > 0 && (
         <div className="countdown-overlay" aria-live="assertive" aria-label={`Grabacion en ${countdown}`}>
@@ -737,8 +765,9 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
         </div>
       )}
 
-      {recordedUrl && (
+      {showChrome && recordedUrl && (
         <section className="take-review" aria-label="Revision de toma">
+          <IconButton className="take-close" icon={X} label="Cerrar toma grabada" onClick={dismissRecording} />
           <video src={recordedUrl} controls playsInline />
           <div>
             <strong>Toma lista</strong>
@@ -758,11 +787,13 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
         </section>
       )}
 
+      {showChrome && (
       <footer className="prompter-dock">
         <IconButton icon={isPlaying ? Pause : Play} label={isPlaying ? 'Pausar lectura' : 'Iniciar lectura'} active={isPlaying} onClick={() => setIsPlaying((current) => !current)} variant="solid" />
         <IconButton icon={RotateCcw} label="Reiniciar guion" onClick={() => moveToLine(0)} />
         <IconButton icon={Minus} label="Linea anterior" onClick={() => moveToLine(activeLine - 1)} />
         <IconButton icon={Plus} label="Linea siguiente" onClick={() => moveToLine(activeLine + 1)} />
+        <IconButton icon={showReadingPanel ? SlidersHorizontal : Settings} label={showReadingPanel ? 'Ocultar ajustes' : 'Mostrar ajustes'} active={showReadingPanel} onClick={() => setShowReadingPanel((current) => !current)} />
         <IconButton icon={settings.voiceFollow ? Mic : MicOff} label="Alternar seguimiento por voz" active={settings.voiceFollow} onClick={() => onSettingsChange({ voiceFollow: !settings.voiceFollow })} />
         <IconButton
           icon={settings.layout === 'overlay' ? Wand2 : ArrowLeftRight}
@@ -792,12 +823,14 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
         />
         <IconButton icon={MonitorUp} label="Mantener pantalla despierta" active={keepAwake} onClick={() => setKeepAwake((current) => !current)} />
         <IconButton icon={settings.theme === 'light' ? Moon : settings.theme === 'dark' ? Sun : Settings} label="Cambiar tema" onClick={() => onSettingsChange({ theme: nextTheme(settings.theme) })} />
+        <IconButton icon={EyeOff} label="Ocultar interfaz" onClick={() => setShowChrome(false)} />
       </footer>
+      )}
 
+      {showChrome && (
       <div className="status-strip">
         <span className={`status-pill status-${speech.status}`}>
           {settings.voiceFollow ? voiceStatusText(speech.status) : 'Voz manual'}
-          {speech.transcript ? `: ${speech.transcript.slice(0, 52)}` : ''}
         </span>
         <span className="status-pill">{hasMic ? 'Micro activo' : 'Micro pendiente'}</span>
         <span className="status-pill">Camara {settings.cameraFacing === 'user' ? 'frontal' : 'trasera'}</span>
@@ -806,13 +839,14 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
         <span className="status-pill">Pantalla {wakeLockText(wakeLockStatus)}</span>
         {recordingError && <span className="status-pill status-error">{recordingError}</span>}
         {shareError && <span className="status-pill status-error">{shareError}</span>}
-        {speech.error && <span className="status-pill status-error">{speech.error}</span>}
+        {speech.error && <span className="status-pill">{speech.error}</span>}
         {recordedUrl && (
           <button className="status-pill status-button" type="button" onClick={downloadRecording}>
             Descargar toma
           </button>
         )}
       </div>
+      )}
     </div>
   )
 }

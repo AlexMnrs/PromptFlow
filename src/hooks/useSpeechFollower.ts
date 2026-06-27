@@ -28,6 +28,11 @@ export function useSpeechFollower({
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const shouldListenRef = useRef(false)
   const currentIndexRef = useRef(currentIndex)
+  const linesRef = useRef(lines)
+  const onLineMatchedRef = useRef(onLineMatched)
+  const onCommandRef = useRef(onCommand)
+  const restartTimerRef = useRef<number | null>(null)
+  const transcriptBufferRef = useRef('')
 
   useEffect(() => {
     currentIndexRef.current = currentIndex
@@ -36,6 +41,19 @@ export function useSpeechFollower({
   useEffect(() => {
     shouldListenRef.current = enabled
   }, [enabled])
+
+  useEffect(() => {
+    linesRef.current = lines
+    transcriptBufferRef.current = ''
+  }, [lines])
+
+  useEffect(() => {
+    onLineMatchedRef.current = onLineMatched
+  }, [onLineMatched])
+
+  useEffect(() => {
+    onCommandRef.current = onCommand
+  }, [onCommand])
 
   useEffect(() => {
     const Recognition = window.SpeechRecognition ?? window.webkitSpeechRecognition
@@ -47,6 +65,11 @@ export function useSpeechFollower({
     }
 
     if (!enabled) {
+      if (restartTimerRef.current !== null) {
+        window.clearTimeout(restartTimerRef.current)
+        restartTimerRef.current = null
+      }
+      transcriptBufferRef.current = ''
       recognitionRef.current?.stop()
       setStatus('paused')
       return
@@ -65,17 +88,30 @@ export function useSpeechFollower({
     }
 
     recognition.onerror = (event) => {
+      if (shouldListenRef.current && isRecoverableSpeechError(event.error)) {
+        setStatus('listening')
+        setError('')
+        return
+      }
+
       setStatus('error')
-      setError(event.error || 'No se pudo continuar escuchando.')
+      setError(speechErrorText(event.error))
     }
 
     recognition.onend = () => {
       if (shouldListenRef.current) {
-        window.setTimeout(() => {
+        restartTimerRef.current = window.setTimeout(() => {
+          restartTimerRef.current = null
+
+          if (!shouldListenRef.current || recognitionRef.current !== recognition) {
+            return
+          }
+
           try {
             recognition.start()
           } catch {
             setStatus('error')
+            setError('No se pudo reanudar el reconocimiento de voz.')
           }
         }, 450)
       } else {
@@ -85,9 +121,17 @@ export function useSpeechFollower({
 
     recognition.onresult = (event) => {
       let spoken = ''
+      let finalSpoken = ''
 
       for (let index = event.resultIndex; index < event.results.length; index += 1) {
-        spoken += event.results[index][0]?.transcript ?? ''
+        const result = event.results[index]
+        const resultTranscript = result[0]?.transcript ?? ''
+
+        spoken += resultTranscript
+
+        if (result.isFinal) {
+          finalSpoken += resultTranscript
+        }
       }
 
       const cleanSpoken = spoken.trim()
@@ -98,31 +142,38 @@ export function useSpeechFollower({
 
       setTranscript(cleanSpoken)
 
+      const cleanFinalSpoken = finalSpoken.trim()
+
+      if (cleanFinalSpoken) {
+        transcriptBufferRef.current = `${transcriptBufferRef.current} ${cleanFinalSpoken}`.trim().split(/\s+/).slice(-48).join(' ')
+      }
+
       if (commandsEnabled) {
         const normalized = normalizeText(cleanSpoken)
 
         if (/\b(siguiente|next)\b/.test(normalized)) {
-          onCommand('next')
+          onCommandRef.current('next')
           return
         }
 
         if (/\b(anterior|atras|previous|back)\b/.test(normalized)) {
-          onCommand('previous')
+          onCommandRef.current('previous')
           return
         }
 
         if (/\b(reiniciar|inicio|reset)\b/.test(normalized)) {
-          onCommand('reset')
+          onCommandRef.current('reset')
           return
         }
 
         if (/\b(pausa|pausar|pause)\b/.test(normalized)) {
-          onCommand('pause')
+          onCommandRef.current('pause')
           return
         }
       }
 
-      onLineMatched(findBestLineIndex(lines, cleanSpoken, currentIndexRef.current))
+      const matchingTranscript = `${transcriptBufferRef.current} ${cleanSpoken}`.trim()
+      onLineMatchedRef.current(findBestLineIndex(linesRef.current, matchingTranscript, currentIndexRef.current))
     }
 
     try {
@@ -134,13 +185,33 @@ export function useSpeechFollower({
 
     return () => {
       shouldListenRef.current = false
+      if (restartTimerRef.current !== null) {
+        window.clearTimeout(restartTimerRef.current)
+        restartTimerRef.current = null
+      }
       recognition.stop()
     }
-  }, [commandsEnabled, enabled, language, lines, onCommand, onLineMatched])
+  }, [commandsEnabled, enabled, language])
 
   return {
     status,
     transcript,
     error,
   }
+}
+
+function isRecoverableSpeechError(error: string) {
+  return error === 'network' || error === 'no-speech' || error === 'aborted'
+}
+
+function speechErrorText(error: string) {
+  if (error === 'not-allowed' || error === 'service-not-allowed') {
+    return 'Permite el microfono para usar el seguimiento por voz.'
+  }
+
+  if (error === 'audio-capture') {
+    return 'No se detecto ningun microfono disponible.'
+  }
+
+  return error || 'No se pudo continuar escuchando.'
 }

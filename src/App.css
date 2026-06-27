@@ -407,6 +407,7 @@
 }
 
 .prompter-topbar,
+.prompter-chrome-toggle,
 .prompter-dock,
 .reading-panel,
 .take-review,
@@ -423,6 +424,21 @@
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.prompter-chrome-toggle {
+  top: max(14px, env(safe-area-inset-top));
+  right: 14px;
+}
+
+.prompter-stage.chrome-hidden .prompter-topbar,
+.prompter-stage.chrome-hidden .prompter-dock,
+.prompter-stage.chrome-hidden .reading-panel,
+.prompter-stage.chrome-hidden .take-review,
+.prompter-stage.chrome-hidden .status-strip,
+.prompter-stage.chrome-hidden .camera-stop,
+.prompter-stage.chrome-hidden .camera-badge {
+  display: none;
 }
 
 .session-title {
@@ -536,6 +552,7 @@
 
 .camera-stop {
   top: 88px;
+  right: calc(14px + min(240px, calc(100vw - 28px)) + 18px);
 }
 
 .camera-badge {
@@ -624,7 +641,9 @@
 .reading-panel {
   top: 96px;
   right: 14px;
-  width: min(220px, calc(100vw - 28px));
+  width: min(240px, calc(100vw - 28px));
+  max-height: calc(100svh - 210px);
+  overflow: auto;
   padding: 12px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
@@ -633,6 +652,23 @@
   color: white;
   background: rgba(6, 9, 12, 0.62);
   backdrop-filter: blur(18px);
+}
+
+.reading-panel-header {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.reading-panel-header .icon-button,
+.take-close {
+  width: 34px;
+  height: 34px;
 }
 
 .reading-panel label {
@@ -671,6 +707,14 @@
   color: white;
   background: rgba(6, 9, 12, 0.72);
   backdrop-filter: blur(18px);
+}
+
+.take-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  background: rgba(5, 8, 10, 0.78);
 }
 
 .take-review video {
@@ -867,8 +911,15 @@
     right: 14px;
     bottom: auto;
     width: 172px;
-    max-height: 188px;
+    max-height: calc(100svh - 242px);
     overflow: auto;
+  }
+
+  .reading-panel-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: rgba(6, 9, 12, 0.82);
   }
 
   .take-review {
