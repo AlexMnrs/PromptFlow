@@ -853,6 +853,7 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
         {countdown > 0 && <span className="status-pill status-countdown">Grabando en {countdown}</span>}
         <span className="status-pill">Zoom {zoomMode}</span>
         <span className="status-pill">Pantalla {wakeLockText(wakeLockStatus)}</span>
+        <span className="status-pill">v{__APP_VERSION__}</span>
         {recordingError && <span className="status-pill status-error">{recordingError}</span>}
         {shareError && <span className="status-pill status-error">{shareError}</span>}
         {speech.error && <span className="status-pill">{speech.error}</span>}
