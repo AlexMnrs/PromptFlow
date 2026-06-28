@@ -114,16 +114,6 @@ export function useSpeechFollower({
     }
 
     recognition.onerror = (event) => {
-      if (event.error === 'aborted') {
-        if (shouldListenRef.current) {
-          shouldListenRef.current = false
-          setStatus('paused')
-          setError('')
-        }
-
-        return
-      }
-
       if (event.error === 'network') {
         networkErrorCountRef.current += 1
 
@@ -284,7 +274,7 @@ function parseVoiceCommand(value: string): 'next' | 'previous' | 'reset' | 'paus
 }
 
 function isRecoverableSpeechError(error: string) {
-  return error === 'network' || error === 'no-speech'
+  return error === 'network' || error === 'no-speech' || error === 'aborted'
 }
 
 function speechErrorText(error: string) {
