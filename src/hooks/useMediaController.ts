@@ -48,7 +48,7 @@ export function useMediaController(videoRef: RefObject<HTMLVideoElement | null>,
   const requestMedia = useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
       setPermission('unsupported')
-      setError('Este navegador no permite acceder a camara y microfono desde la web.')
+      setError('This browser does not allow camera and microphone access from the web.')
       return null
     }
 
@@ -64,13 +64,13 @@ export function useMediaController(videoRef: RefObject<HTMLVideoElement | null>,
       try {
         const media = await navigator.mediaDevices.getUserMedia({ video: mediaConstraints.video })
         assignStream(media, 'partial')
-        setError('Camara activa. El microfono no esta disponible para esta sesion.')
+        setError('Camera is active. The microphone is not available for this session.')
         return media
       } catch {
         try {
           const media = await navigator.mediaDevices.getUserMedia({ audio: mediaConstraints.audio })
           assignStream(media, 'partial')
-          setError('Microfono activo. La camara no esta disponible para esta sesion.')
+          setError('Microphone is active. The camera is not available for this session.')
           return media
         } catch {
           assignStream(null, 'blocked')

@@ -279,11 +279,11 @@ function isRecoverableSpeechError(error: string) {
 
 function speechErrorText(error: string) {
   if (error === 'not-allowed' || error === 'service-not-allowed') {
-    return 'Permite el microfono para usar el seguimiento por voz.'
+    return 'Allow microphone access to use voice-following.'
   }
 
   if (error === 'audio-capture') {
-    return 'No se detecto ningun microfono disponible.'
+    return 'No microphone was detected.'
   }
 
   return error || 'No se pudo continuar escuchando.'

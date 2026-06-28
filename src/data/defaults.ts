@@ -1,14 +1,14 @@
 import type { AppState, PrompterSettings, ScriptItem } from '../types'
 
-const sampleBody = `Hola. Hoy quiero grabar una pieza clara, directa y sin perder el hilo.
+const sampleBody = `Hi. Today I want to record a clear, direct take without losing the thread.
 
-La idea principal aparece al principio, porque la audiencia decide muy rapido si se queda.
+The main idea appears at the beginning, because the audience decides quickly whether to keep watching.
 
-Cuando el texto avanza con mi voz, puedo mirar mas a camara y menos a la pantalla.
+When the text follows my voice, I can look more at the camera and less at the screen.
 
-Si necesito improvisar, pauso un momento, vuelvo a la linea activa y sigo sin romper la toma.
+If I need to improvise, I pause for a moment, return to the active line, and continue without breaking the take.
 
-Al final cierro con una frase breve, una accion concreta y una pausa natural.`
+At the end, I close with a short sentence, a clear action, and a natural pause.`
 
 export const defaultSettings: PrompterSettings = {
   layout: 'overlay',
@@ -20,7 +20,7 @@ export const defaultSettings: PrompterSettings = {
   textWidth: 82,
   speed: 1,
   theme: 'dark',
-  language: 'es-ES',
+  language: 'en-US',
   overlayOpacity: 0.44,
   voiceFollow: true,
   voiceCommands: true,
@@ -31,7 +31,7 @@ export function createId() {
   return crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
-export function createScript(title = 'Nuevo guion', body = ''): ScriptItem {
+export function createScript(title = 'New script', body = ''): ScriptItem {
   const now = new Date().toISOString()
 
   return {
@@ -45,7 +45,7 @@ export function createScript(title = 'Nuevo guion', body = ''): ScriptItem {
 }
 
 export function createDefaultState(): AppState {
-  const seedScript = createScript('Guion de bienvenida', sampleBody)
+  const seedScript = createScript('Welcome script', sampleBody)
 
   return {
     scripts: [seedScript],

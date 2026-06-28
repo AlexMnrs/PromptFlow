@@ -54,7 +54,7 @@ import type { AppState, AppView, PrompterSettings, SaveStatus, ScriptItem } from
 function App() {
   const [appState, setAppState] = useState<AppState>(() => loadState())
   const [view, setView] = useState<AppView>('library')
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>('Guardado')
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('Saved')
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const isAndroid = useMemo(() => isAndroidBrowser(), [])
   const selectedScript = useMemo(
@@ -64,9 +64,9 @@ function App() {
 
   useEffect(() => {
     try {
-      setSaveStatus('Guardando')
+      setSaveStatus('Saving')
       saveState(appState)
-      const timer = window.setTimeout(() => setSaveStatus('Guardado'), 220)
+      const timer = window.setTimeout(() => setSaveStatus('Saved'), 220)
       return () => window.clearTimeout(timer)
     } catch {
       setSaveStatus('Error')
@@ -122,7 +122,7 @@ function App() {
       return
     }
 
-    const script = createScript(`${selectedScript.title} copia`, selectedScript.body)
+    const script = createScript(`${selectedScript.title} copy`, selectedScript.body)
     setAppState((current) => ({
       ...current,
       scripts: [script, ...current.scripts],
@@ -132,7 +132,7 @@ function App() {
   }, [selectedScript])
 
   const deleteSelectedScript = useCallback(() => {
-    if (!selectedScript || !window.confirm(`Eliminar "${selectedScript.title}"?`)) {
+    if (!selectedScript || !window.confirm(`Delete "${selectedScript.title}"?`)) {
       return
     }
 
@@ -166,7 +166,7 @@ function App() {
     }
 
     const text = await file.text()
-    const title = file.name.replace(/\.[^.]+$/, '') || 'Guion importado'
+    const title = file.name.replace(/\.[^.]+$/, '') || 'Imported script'
     const script = createScript(title, text.trim())
 
     setAppState((current) => ({
@@ -185,25 +185,25 @@ function App() {
     <main className={`app-shell theme-${appState.settings.theme} view-${view}`}>
       <input ref={importInputRef} className="visually-hidden" type="file" accept=".txt,.md,text/plain,text/markdown" onChange={handleImportFile} />
 
-      <aside className="library-rail" aria-label="Biblioteca de guiones">
+      <aside className="library-rail" aria-label="Script library">
         <div className="brand-lockup">
           <div className="brand-mark" aria-hidden="true">
             PF
           </div>
           <div>
             <p className="eyebrow">PromptFlow</p>
-            <h1>Prompter movil</h1>
+            <h1>Mobile prompter</h1>
           </div>
         </div>
 
         <div className="rail-actions">
           <button className="primary-action" type="button" onClick={createNewScript}>
             <Plus aria-hidden="true" size={18} />
-            Nuevo
+            New
           </button>
           <button className="secondary-action" type="button" onClick={() => importInputRef.current?.click()}>
             <Import aria-hidden="true" size={18} />
-            Importar
+            Import
           </button>
         </div>
 
@@ -215,7 +215,7 @@ function App() {
         </div>
       </aside>
 
-      <section className="workspace" aria-label="Area de trabajo">
+      <section className="workspace" aria-label="Workspace">
         {view === 'library' && (
           <LibraryPanel
             scripts={appState.scripts}
@@ -269,7 +269,7 @@ function ScriptList({ scripts, selectedId, onSelect }: ScriptListProps) {
     <div className="script-list">
       {scripts.map((script) => (
         <button key={script.id} className={`script-row ${script.id === selectedId ? 'is-selected' : ''}`} type="button" onClick={() => onSelect(script.id)}>
-          <span>{script.title || 'Sin titulo'}</span>
+          <span>{script.title || 'Untitled'}</span>
           <small>{estimateMinutes(script.body)} min</small>
         </button>
       ))}
@@ -292,12 +292,12 @@ function LibraryPanel({ scripts, selectedScript, showAndroidWarning, onCreate, o
     <div className="panel library-panel">
       <div className="panel-header">
         <div>
-          <p className="eyebrow">Biblioteca</p>
-          <h2>Tus guiones</h2>
+          <p className="eyebrow">Library</p>
+          <h2>Your scripts</h2>
         </div>
         <div className="header-actions">
-          <IconButton icon={Upload} label="Importar guion" onClick={onImport} />
-          <IconButton icon={FilePlus2} label="Crear guion" onClick={onCreate} variant="solid" />
+          <IconButton icon={Upload} label="Import script" onClick={onImport} />
+          <IconButton icon={FilePlus2} label="Create script" onClick={onCreate} variant="solid" />
         </div>
       </div>
 
@@ -307,16 +307,16 @@ function LibraryPanel({ scripts, selectedScript, showAndroidWarning, onCreate, o
         {scripts.map((script) => (
           <article key={script.id} className={`script-card ${script.id === selectedScript.id ? 'is-selected' : ''}`}>
             <div>
-              <h3>{script.title || 'Sin titulo'}</h3>
+              <h3>{script.title || 'Untitled'}</h3>
               <p>{previewText(script.body)}</p>
             </div>
             <div className="card-meta">
-              <span>{estimateMinutes(script.body)} min estimados</span>
-              <span>{new Date(script.updatedAt).toLocaleDateString('es-ES')}</span>
+              <span>{estimateMinutes(script.body)} min estimated</span>
+              <span>{new Date(script.updatedAt).toLocaleDateString('en-US')}</span>
             </div>
             <div className="card-actions">
               <button className="secondary-action" type="button" onClick={() => onOpen(script.id)}>
-                Editar
+                Edit
               </button>
               <button className="primary-action" type="button" onClick={() => onPrompt(script.id)}>
                 <Video aria-hidden="true" size={17} />
@@ -351,13 +351,13 @@ function EditorPanel({ script, settings, saveStatus, showAndroidWarning, onPatch
       <div className="panel-header">
         <div>
           <p className="eyebrow">Editor</p>
-          <h2>Prepara la toma</h2>
+          <h2>Prepare the take</h2>
         </div>
         <div className="header-actions">
-          <IconButton icon={Library} label="Abrir biblioteca" onClick={onOpenLibrary} />
-          <IconButton icon={Copy} label="Duplicar guion" onClick={onDuplicate} />
-          <IconButton icon={Download} label="Exportar texto" onClick={onExport} />
-          <IconButton icon={Trash2} label="Eliminar guion" onClick={onDelete} variant="danger" />
+          <IconButton icon={Library} label="Open library" onClick={onOpenLibrary} />
+          <IconButton icon={Copy} label="Duplicate script" onClick={onDuplicate} />
+          <IconButton icon={Download} label="Export text" onClick={onExport} />
+          <IconButton icon={Trash2} label="Delete script" onClick={onDelete} variant="danger" />
         </div>
       </div>
 
@@ -366,12 +366,12 @@ function EditorPanel({ script, settings, saveStatus, showAndroidWarning, onPatch
       <div className="editor-layout">
         <section className="editor-card">
           <label className="field-label" htmlFor="script-title">
-            Titulo
+            Title
           </label>
           <input id="script-title" className="title-input" value={script.title} onChange={(event) => onPatch({ title: event.target.value })} />
 
           <label className="field-label" htmlFor="script-body">
-            Guion
+            Script
           </label>
           <textarea id="script-body" className="script-editor" value={script.body} onChange={(event) => onPatch({ body: event.target.value })} spellCheck="true" />
         </section>
@@ -379,7 +379,7 @@ function EditorPanel({ script, settings, saveStatus, showAndroidWarning, onPatch
         <aside className="prep-card">
           <div className="prep-stat">
             <span>{wordCount}</span>
-            <small>palabras</small>
+            <small>words</small>
           </div>
           <div className="prep-stat">
             <span>{estimateMinutes(script.body, settings.speed)}</span>
@@ -392,16 +392,16 @@ function EditorPanel({ script, settings, saveStatus, showAndroidWarning, onPatch
             </p>
             <p>
               <Mic aria-hidden="true" size={16} />
-              Voz en {settings.language}
+              Voice in {settings.language}
             </p>
             <p>
               <Wand2 aria-hidden="true" size={16} />
-              {settings.layout === 'overlay' ? 'Texto sobre camara' : 'Vista dividida'}
+              {settings.layout === 'overlay' ? 'Text over camera' : 'Split view'}
             </p>
           </div>
           <button className="record-launch" type="button" onClick={onPrompt}>
             <Video aria-hidden="true" size={20} />
-            Abrir prompter
+            Open prompter
           </button>
         </aside>
       </div>
@@ -581,7 +581,7 @@ function PrompterPanel({ script, settings, showAndroidWarning, onSettingsChange,
         setIsPlaying(true)
       } catch (recordError) {
         pendingRecordingStreamRef.current = null
-        setRecordingError(recordError instanceof Error ? recordError.message : 'No se pudo iniciar la grabacion.')
+        setRecordingError(recordError instanceof Error ? recordError.message : 'Could not start recording.')
       }
     },
     [],
@@ -600,7 +600,7 @@ function PrompterPanel({ script, settings, showAndroidWarning, onSettingsChange,
         if (liveStream) {
           beginRecording(liveStream)
         } else {
-          setRecordingError('La camara o el microfono dejaron de estar disponibles.')
+          setRecordingError('Camera or microphone became unavailable.')
         }
 
         return
@@ -623,14 +623,14 @@ function PrompterPanel({ script, settings, showAndroidWarning, onSettingsChange,
     }
 
     if (!window.MediaRecorder) {
-      setRecordingError('La grabacion desde navegador no esta disponible en este dispositivo.')
+      setRecordingError('Browser recording is not available on this device.')
       return
     }
 
     const liveStream = stream ?? (await requestMedia())
 
     if (!liveStream) {
-      setRecordingError('Activa camara o microfono antes de grabar.')
+      setRecordingError('Enable camera or microphone before recording.')
       return
     }
 
@@ -679,8 +679,8 @@ function PrompterPanel({ script, settings, showAndroidWarning, onSettingsChange,
       try {
         await navigator.share({
           files: [file],
-          title: script.title || 'Toma',
-          text: 'Toma grabada en PromptFlow',
+          title: script.title || 'Take',
+          text: 'Take recorded in PromptFlow',
         })
         return
       } catch (error) {
@@ -688,12 +688,12 @@ function PrompterPanel({ script, settings, showAndroidWarning, onSettingsChange,
           return
         }
 
-        setShareError('No se pudo abrir compartir. Descarga la toma como alternativa.')
+        setShareError('Could not open sharing. Download the take instead.')
         return
       }
     }
 
-    setShareError('Compartir archivo no esta disponible en este navegador.')
+    setShareError('File sharing is not available in this browser.')
   }, [recordedBlob, recordedMime, script])
 
   return (
@@ -712,15 +712,15 @@ function PrompterPanel({ script, settings, showAndroidWarning, onSettingsChange,
       <header className="prompter-topbar">
         <IconButton icon={ArrowLeft} label="Volver al editor" onClick={onBack} />
         <div className="session-title">
-          <strong>{script.title || 'Sin titulo'}</strong>
-          <span>{isRecording ? `Grabando ${formatDuration(elapsed)}` : `${progress}% leido`}</span>
+          <strong>{script.title || 'Untitled'}</strong>
+          <span>{isRecording ? `Recording ${formatDuration(elapsed)}` : `${progress}% read`}</span>
         </div>
-        <IconButton icon={showReadingPanel ? SlidersHorizontal : Settings} label={showReadingPanel ? 'Ocultar ajustes' : 'Mostrar ajustes'} active={showReadingPanel} onClick={() => setShowReadingPanel((current) => !current)} />
-        <IconButton icon={EyeOff} label="Ocultar interfaz" onClick={() => setShowChrome(false)} />
-        <div className={`record-dot ${isRecording ? 'is-live' : ''}`} aria-label={isRecording ? 'Grabacion activa' : 'Grabacion detenida'} />
+        <IconButton icon={showReadingPanel ? SlidersHorizontal : Settings} label={showReadingPanel ? 'Hide settings' : 'Show settings'} active={showReadingPanel} onClick={() => setShowReadingPanel((current) => !current)} />
+        <IconButton icon={EyeOff} label="Hide interface" onClick={() => setShowChrome(false)} />
+        <div className={`record-dot ${isRecording ? 'is-live' : ''}`} aria-label={isRecording ? 'Recording active' : 'Recording stopped'} />
       </header>
 
-      {!showChrome && <IconButton className="prompter-chrome-toggle" icon={Eye} label="Mostrar interfaz" onClick={() => setShowChrome(true)} variant="solid" />}
+      {!showChrome && <IconButton className="prompter-chrome-toggle" icon={Eye} label="Show interface" onClick={() => setShowChrome(true)} variant="solid" />}
 
       <section className="stage-body" aria-label="Prompter">
         <CameraPane
@@ -745,19 +745,19 @@ function PrompterPanel({ script, settings, showAndroidWarning, onSettingsChange,
       </section>
 
       {showChrome && showReadingPanel && (
-        <aside className="reading-panel" aria-label="Ajustes de lectura">
+        <aside className="reading-panel" aria-label="Reading settings">
           <div className="reading-panel-header">
-            <span>Ajustes</span>
-            <IconButton icon={X} label="Cerrar ajustes" onClick={() => setShowReadingPanel(false)} />
+            <span>Settings</span>
+            <IconButton icon={X} label="Close settings" onClick={() => setShowReadingPanel(false)} />
           </div>
           <label>
             <Type aria-hidden="true" size={16} />
-            Texto
+            Text
             <input type="range" min="22" max="58" value={settings.fontSize} onChange={(event) => onSettingsChange({ fontSize: Number(event.target.value) })} />
           </label>
           <label>
             <SlidersHorizontal aria-hidden="true" size={16} />
-            Velocidad
+            Speed
             <input type="range" min="0.5" max="2.5" step="0.1" value={settings.speed} onChange={(event) => onSettingsChange({ speed: Number(event.target.value) })} />
           </label>
           <label>
@@ -767,14 +767,14 @@ function PrompterPanel({ script, settings, showAndroidWarning, onSettingsChange,
           </label>
           <label>
             <Languages aria-hidden="true" size={16} />
-            Idioma
+            Language
             <select value={settings.language} onChange={(event) => onSettingsChange({ language: event.target.value })}>
-              <option value="es-ES">Espanol</option>
+              <option value="es-ES">Spanish</option>
               <option value="en-US">English</option>
               <option value="fr-FR">Francais</option>
               <option value="de-DE">Deutsch</option>
               <option value="it-IT">Italiano</option>
-              <option value="pt-PT">Portugues</option>
+              <option value="pt-PT">Portuguese</option>
             </select>
           </label>
         </aside>
@@ -783,27 +783,27 @@ function PrompterPanel({ script, settings, showAndroidWarning, onSettingsChange,
       {showChrome && showAndroidWarning && settings.voiceFollow && <AndroidSpeechWarning className="prompter-warning" compact />}
 
       {countdown > 0 && (
-        <div className="countdown-overlay" aria-live="assertive" aria-label={`Grabacion en ${countdown}`}>
+        <div className="countdown-overlay" aria-live="assertive" aria-label={`Recording in ${countdown}`}>
           <span>{countdown}</span>
         </div>
       )}
 
       {showChrome && recordedUrl && (
-        <section className="take-review" aria-label="Revision de toma">
-          <IconButton className="take-close" icon={X} label="Cerrar toma grabada" onClick={dismissRecording} />
+        <section className="take-review" aria-label="Take review">
+          <IconButton className="take-close" icon={X} label="Close recorded take" onClick={dismissRecording} />
           <video src={recordedUrl} controls playsInline />
           <div>
-            <strong>Toma lista</strong>
+            <strong>Take ready</strong>
             <span>{recordedMime || 'video'}</span>
           </div>
           <div className="take-actions">
             <button className="secondary-action" type="button" onClick={downloadRecording}>
               <Download aria-hidden="true" size={16} />
-              Descargar
+              Download
             </button>
             <button className="primary-action" type="button" onClick={shareRecording}>
               <Share2 aria-hidden="true" size={16} />
-              Compartir
+              Share
             </button>
           </div>
           {shareError && <p>{shareError}</p>}
@@ -812,68 +812,68 @@ function PrompterPanel({ script, settings, showAndroidWarning, onSettingsChange,
 
       {showChrome && (
       <footer className="prompter-dock">
-        <IconButton icon={isPlaying ? Pause : Play} label={isPlaying ? 'Pausar lectura' : 'Iniciar lectura'} active={isPlaying} onClick={() => setIsPlaying((current) => !current)} variant="solid" />
-        <IconButton icon={RotateCcw} label="Reiniciar guion" onClick={() => moveToLine(0)} />
-        <IconButton icon={Minus} label="Linea anterior" onClick={() => moveToLine(activeLine - 1)} />
-        <IconButton icon={Plus} label="Linea siguiente" onClick={() => moveToLine(activeLine + 1)} />
-        <IconButton icon={showReadingPanel ? SlidersHorizontal : Settings} label={showReadingPanel ? 'Ocultar ajustes' : 'Mostrar ajustes'} active={showReadingPanel} onClick={() => setShowReadingPanel((current) => !current)} />
-        <IconButton icon={settings.voiceFollow ? Mic : MicOff} label="Alternar seguimiento por voz" active={settings.voiceFollow} onClick={() => onSettingsChange({ voiceFollow: !settings.voiceFollow })} />
+        <IconButton icon={isPlaying ? Pause : Play} label={isPlaying ? 'Pause reading' : 'Start reading'} active={isPlaying} onClick={() => setIsPlaying((current) => !current)} variant="solid" />
+        <IconButton icon={RotateCcw} label="Restart script" onClick={() => moveToLine(0)} />
+        <IconButton icon={Minus} label="Previous line" onClick={() => moveToLine(activeLine - 1)} />
+        <IconButton icon={Plus} label="Next line" onClick={() => moveToLine(activeLine + 1)} />
+        <IconButton icon={showReadingPanel ? SlidersHorizontal : Settings} label={showReadingPanel ? 'Hide settings' : 'Show settings'} active={showReadingPanel} onClick={() => setShowReadingPanel((current) => !current)} />
+        <IconButton icon={settings.voiceFollow ? Mic : MicOff} label="Toggle voice-following" active={settings.voiceFollow} onClick={() => onSettingsChange({ voiceFollow: !settings.voiceFollow })} />
         <IconButton
           icon={settings.layout === 'overlay' ? Wand2 : ArrowLeftRight}
-          label="Alternar overlay y split"
+          label="Switch overlay and split"
           active={settings.layout === 'split'}
           onClick={() => onSettingsChange({ layout: settings.layout === 'overlay' ? 'split' : 'overlay' })}
         />
         <IconButton
           icon={ArrowLeftRight}
-          label="Cambiar lado del split"
+          label="Swap split side"
           onClick={() => onSettingsChange({ splitOrder: settings.splitOrder === 'script-first' ? 'camera-first' : 'script-first' })}
         />
         <IconButton
           icon={hasCamera ? CameraOff : Camera}
-          label={hasCamera ? 'Detener camara' : 'Activar camara'}
+          label={hasCamera ? 'Stop camera' : 'Enable camera'}
           active={hasCamera}
           disabled={isRecording || countdown > 0}
           onClick={hasCamera ? stopMedia : () => void requestMedia()}
         />
         <IconButton
           icon={SwitchCamera}
-          label="Cambiar camara frontal o trasera"
+          label="Switch front or rear camera"
           active={settings.cameraFacing === 'environment'}
           disabled={isRecording || countdown > 0}
           onClick={() => onSettingsChange({ cameraFacing: settings.cameraFacing === 'user' ? 'environment' : 'user' })}
         />
-        <IconButton icon={RefreshCcw} label="Alternar espejo" active={settings.mirror} onClick={() => onSettingsChange({ mirror: !settings.mirror })} />
+        <IconButton icon={RefreshCcw} label="Toggle mirror" active={settings.mirror} onClick={() => onSettingsChange({ mirror: !settings.mirror })} />
         <IconButton
           icon={isRecording || countdown > 0 ? Square : CircleDot}
-          label={isRecording ? 'Detener grabacion' : countdown > 0 ? 'Cancelar cuenta atras' : 'Grabar'}
+          label={isRecording ? 'Stop recording' : countdown > 0 ? 'Cancel countdown' : 'Record'}
           active={isRecording || countdown > 0}
           variant={isRecording || countdown > 0 ? 'danger' : 'glass'}
           onClick={isRecording ? stopRecording : startRecording}
         />
-        <IconButton icon={MonitorUp} label="Mantener pantalla despierta" active={keepAwake} onClick={() => setKeepAwake((current) => !current)} />
-        <IconButton icon={settings.theme === 'light' ? Moon : settings.theme === 'dark' ? Sun : Settings} label="Cambiar tema" onClick={() => onSettingsChange({ theme: nextTheme(settings.theme) })} />
-        <IconButton icon={EyeOff} label="Ocultar interfaz" onClick={() => setShowChrome(false)} />
+        <IconButton icon={MonitorUp} label="Keep screen awake" active={keepAwake} onClick={() => setKeepAwake((current) => !current)} />
+        <IconButton icon={settings.theme === 'light' ? Moon : settings.theme === 'dark' ? Sun : Settings} label="Change theme" onClick={() => onSettingsChange({ theme: nextTheme(settings.theme) })} />
+        <IconButton icon={EyeOff} label="Hide interface" onClick={() => setShowChrome(false)} />
       </footer>
       )}
 
       {showChrome && (
       <div className="status-strip">
         <span className={`status-pill status-${speech.status}`}>
-          {settings.voiceFollow ? voiceStatusText(speech.status) : 'Voz manual'}
+          {settings.voiceFollow ? voiceStatusText(speech.status) : 'Manual voice'}
         </span>
-        <span className="status-pill">{hasMic ? 'Micro activo' : 'Micro pendiente'}</span>
-        <span className="status-pill">Camara {settings.cameraFacing === 'user' ? 'frontal' : 'trasera'}</span>
-        {countdown > 0 && <span className="status-pill status-countdown">Grabando en {countdown}</span>}
+        <span className="status-pill">{hasMic ? 'Mic active' : 'Mic pending'}</span>
+        <span className="status-pill">Camera {settings.cameraFacing === 'user' ? 'front' : 'rear'}</span>
+        {countdown > 0 && <span className="status-pill status-countdown">Recording in {countdown}</span>}
         <span className="status-pill">Zoom {zoomMode}</span>
-        <span className="status-pill">Pantalla {wakeLockText(wakeLockStatus)}</span>
+        <span className="status-pill">Screen {wakeLockText(wakeLockStatus)}</span>
         <span className="status-pill">v{__APP_VERSION__}</span>
         {recordingError && <span className="status-pill status-error">{recordingError}</span>}
         {shareError && <span className="status-pill status-error">{shareError}</span>}
         {speech.error && <span className="status-pill">{speech.error}</span>}
         {recordedUrl && (
           <button className="status-pill status-button" type="button" onClick={downloadRecording}>
-            Descargar toma
+            Download take
           </button>
         )}
       </div>
@@ -898,21 +898,21 @@ function CameraPane({ videoRef, hasCamera, permission, mediaError, mirror, zoomM
   const shouldShowPermissionCard = !hasCamera && permission !== 'idle'
 
   return (
-    <div className={`camera-pane ${mirror ? 'is-mirrored' : ''} ${zoomMode === 'preview' ? 'uses-preview-zoom' : ''}`} aria-label="Vista de camara">
+    <div className={`camera-pane ${mirror ? 'is-mirrored' : ''} ${zoomMode === 'preview' ? 'uses-preview-zoom' : ''}`} aria-label="Camera view">
       <video ref={videoRef} autoPlay playsInline muted />
       {shouldShowPermissionCard && (
         <div className="permission-card">
           <VideoOff aria-hidden="true" size={32} />
-          <h3>{permission === 'requesting' ? 'Solicitando permiso' : 'Camara pendiente'}</h3>
-          <p>{mediaError || 'Activa camara y microfono para grabar mientras lees.'}</p>
+          <h3>{permission === 'requesting' ? 'Requesting permission' : 'Camera pending'}</h3>
+          <p>{mediaError || 'Enable camera and microphone to record while reading.'}</p>
           <button className="primary-action" type="button" onClick={onRequestMedia}>
             <Video aria-hidden="true" size={17} />
-            Activar
+            Enable
           </button>
         </div>
       )}
       <div className="camera-badge">
-        {cameraFacing === 'user' ? 'Frontal' : 'Trasera'} · Vista {mirror ? 'espejo' : 'normal'} · {zoom.toFixed(1)}x
+        {cameraFacing === 'user' ? 'Front' : 'Rear'} · {mirror ? 'Mirrored' : 'Normal'} view · {zoom.toFixed(1)}x
       </div>
     </div>
   )
@@ -933,7 +933,7 @@ function ScriptPane({ lines, activeLine, lineStep, matchedWordCount, onLineSelec
   )
 
   return (
-    <div className="script-pane" aria-label="Texto del prompter">
+    <div className="script-pane" aria-label="Prompter text">
       <div className="script-track" style={{ transform: `translateY(calc(var(--active-offset) - ${activeLine * lineStep}px))` }}>
         {lines.map((line, index) => (
           <button key={`${line}-${index}`} type="button" className={`script-line ${index === activeLine ? 'is-active' : ''}`} onClick={() => onLineSelect(index)}>
@@ -980,18 +980,18 @@ interface AndroidSpeechWarningProps {
 
 function AndroidSpeechWarning({ className = '', compact = false }: AndroidSpeechWarningProps) {
   return (
-    <aside className={`android-warning ${className}`} role="note" aria-label="Aviso sobre reconocimiento de voz en Android">
+    <aside className={`android-warning ${className}`} role="note" aria-label="Android voice recognition notice">
       <AlertTriangle aria-hidden="true" size={compact ? 18 : 22} />
       <div>
-        <strong>Reconocimiento de voz limitado en Android</strong>
-        {!compact && <p>En algunos dispositivos y navegadores Android, el microfono puede activarse y detenerse repetidamente. Si ocurre, usa los controles manuales o prueba iOS, Safari o escritorio.</p>}
+        <strong>Limited voice recognition on Android</strong>
+        {!compact && <p>On some Android devices and browsers, the microphone may start and stop repeatedly. If that happens, use the manual controls or try iOS, Safari, or desktop.</p>}
       </div>
     </aside>
   )
 }
 
 function previewText(body: string) {
-  return body.trim().replace(/\s+/g, ' ').slice(0, 124) || 'Guion vacio. Abre el editor para empezar.'
+  return body.trim().replace(/\s+/g, ' ').slice(0, 124) || 'Empty script. Open the editor to get started.'
 }
 
 function isAndroidBrowser() {
@@ -1021,7 +1021,7 @@ function getRecordingExtension(mimeType: string): 'mp4' | 'webm' {
 
 function wakeLockText(status: string) {
   if (status === 'active') {
-    return 'activa'
+    return 'active'
   }
 
   if (status === 'unsupported') {
@@ -1029,30 +1029,30 @@ function wakeLockText(status: string) {
   }
 
   if (status === 'blocked') {
-    return 'bloqueada'
+    return 'blocked'
   }
 
-  return 'lista'
+  return 'ready'
 }
 
 function voiceStatusText(status: string) {
   if (status === 'listening') {
-    return 'Escuchando'
+    return 'Listening'
   }
 
   if (status === 'unsupported') {
-    return 'Voz no disponible'
+    return 'Voice unavailable'
   }
 
   if (status === 'error') {
-    return 'Error de voz'
+    return 'Voice error'
   }
 
   if (status === 'paused') {
-    return 'Voz pausada'
+    return 'Voice paused'
   }
 
-  return 'Voz lista'
+  return 'Voice ready'
 }
 
 function downloadBlob(blob: Blob, fileName: string) {

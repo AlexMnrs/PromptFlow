@@ -8,7 +8,7 @@ export function splitScript(body: string) {
     .map((line) => line.trim())
     .filter(Boolean)
 
-  return chunks.length > 0 ? chunks : ['Escribe o importa un guion para empezar.']
+  return chunks.length > 0 ? chunks : ['Write or import a script to get started.']
 }
 
 export function countWords(body: string) {
@@ -270,7 +270,7 @@ export function fileNameForScript(script: ScriptItem, extension: 'txt' | 'mp4' |
     normalizeText(script.title)
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
-      .slice(0, 44) || 'guion'
+      .slice(0, 44) || 'script'
 
   return `${safeTitle}-${date}.${extension}`
 }

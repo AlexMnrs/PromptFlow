@@ -1,7 +1,7 @@
 {
   "name": "PromptFlow",
   "short_name": "PromptFlow",
-  "description": "Prompter movil con camara, grabacion y seguimiento por voz opcional.",
+  "description": "Mobile teleprompter with camera, recording, and optional voice-following.",
   "start_url": ".",
   "display": "standalone",
   "orientation": "any",

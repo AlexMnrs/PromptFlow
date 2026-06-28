@@ -8,7 +8,7 @@ export type ThemeMode = 'dark' | 'light' | 'contrast'
 
 export type CameraFacing = 'user' | 'environment'
 
-export type SaveStatus = 'Guardado' | 'Guardando' | 'Error'
+export type SaveStatus = 'Saved' | 'Saving' | 'Error'
 
 export interface ScriptItem {
   id: string
