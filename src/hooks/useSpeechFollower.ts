@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { findVoiceTargetLine, normalizeText } from '../lib/prompter'
+import { findVoiceTargetLine, getLineVoiceProgress, normalizeText } from '../lib/prompter'
 
 type SpeechStatus = 'idle' | 'listening' | 'paused' | 'unsupported' | 'error'
 
@@ -9,6 +9,7 @@ interface SpeechFollowerOptions {
   lines: string[]
   currentIndex: number
   commandsEnabled: boolean
+  trackingActive: boolean
   onLineMatched: (index: number) => void
   onCommand: (command: 'next' | 'previous' | 'reset' | 'pause') => void
 }
@@ -19,12 +20,14 @@ export function useSpeechFollower({
   lines,
   currentIndex,
   commandsEnabled,
+  trackingActive,
   onLineMatched,
   onCommand,
 }: SpeechFollowerOptions) {
   const [status, setStatus] = useState<SpeechStatus>('idle')
   const [transcript, setTranscript] = useState('')
   const [matchingTranscript, setMatchingTranscript] = useState('')
+  const [matchedWordCount, setMatchedWordCount] = useState(0)
   const [error, setError] = useState('')
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const shouldListenRef = useRef(false)
@@ -33,14 +36,18 @@ export function useSpeechFollower({
   const linesRef = useRef(lines)
   const onLineMatchedRef = useRef(onLineMatched)
   const onCommandRef = useRef(onCommand)
+  const trackingActiveRef = useRef(trackingActive)
   const restartTimerRef = useRef<number | null>(null)
   const networkErrorCountRef = useRef(0)
   const transcriptBufferRef = useRef('')
+  const matchedWordCountRef = useRef(0)
 
   useEffect(() => {
     if (previousIndexRef.current !== currentIndex) {
       transcriptBufferRef.current = ''
+      matchedWordCountRef.current = 0
       setMatchingTranscript('')
+      setMatchedWordCount(0)
       previousIndexRef.current = currentIndex
     }
 
@@ -52,8 +59,14 @@ export function useSpeechFollower({
   }, [enabled])
 
   useEffect(() => {
+    trackingActiveRef.current = trackingActive
+  }, [trackingActive])
+
+  useEffect(() => {
     linesRef.current = lines
     transcriptBufferRef.current = ''
+    matchedWordCountRef.current = 0
+    setMatchedWordCount(0)
   }, [lines])
 
   useEffect(() => {
@@ -79,7 +92,9 @@ export function useSpeechFollower({
         restartTimerRef.current = null
       }
       transcriptBufferRef.current = ''
+      matchedWordCountRef.current = 0
       setMatchingTranscript('')
+      setMatchedWordCount(0)
       recognitionRef.current?.stop()
       setStatus('paused')
       return
@@ -164,6 +179,10 @@ export function useSpeechFollower({
 
       setTranscript(cleanSpoken)
 
+      if (!trackingActiveRef.current) {
+        return
+      }
+
       const cleanFinalSpoken = finalSpoken.trim()
 
       if (cleanFinalSpoken) {
@@ -171,33 +190,33 @@ export function useSpeechFollower({
       }
 
       if (commandsEnabled) {
-        const normalized = normalizeText(cleanSpoken)
-        const commandWordCount = normalized.split(/\s+/).filter(Boolean).length
+        const command = parseVoiceCommand(cleanSpoken)
 
-        if (commandWordCount <= 3 && /^(siguiente|linea siguiente|next)$/.test(normalized)) {
-          onCommandRef.current('next')
-          return
-        }
-
-        if (commandWordCount <= 3 && /^(anterior|atras|linea anterior|previous|back)$/.test(normalized)) {
-          onCommandRef.current('previous')
-          return
-        }
-
-        if (commandWordCount <= 3 && /^(reiniciar|inicio|reset)$/.test(normalized)) {
-          onCommandRef.current('reset')
-          return
-        }
-
-        if (commandWordCount <= 3 && /^(pausa|pausar|pause)$/.test(normalized)) {
-          onCommandRef.current('pause')
+        if (command) {
+          onCommandRef.current(command)
           return
         }
       }
 
       const matchingTranscript = `${transcriptBufferRef.current} ${cleanSpoken}`.trim()
+      const progress = getLineVoiceProgress(linesRef.current[currentIndexRef.current] ?? '', cleanSpoken, {
+        allowBacktrack: true,
+        cursorWordCount: matchedWordCountRef.current,
+        maxAdvanceWords: 1,
+      })
+      const targetLine = findVoiceTargetLine(linesRef.current, cleanSpoken, currentIndexRef.current, progress.matchedWordCount)
+      const targetProgress =
+        targetLine === currentIndexRef.current
+          ? progress
+          : getLineVoiceProgress(linesRef.current[targetLine] ?? '', cleanSpoken, {
+              cursorWordCount: 0,
+              maxAdvanceWords: 1,
+            })
+
+      matchedWordCountRef.current = targetProgress.matchedWordCount
       setMatchingTranscript(matchingTranscript)
-      onLineMatchedRef.current(findVoiceTargetLine(linesRef.current, matchingTranscript, currentIndexRef.current))
+      setMatchedWordCount(matchedWordCountRef.current)
+      onLineMatchedRef.current(targetLine)
     }
 
     try {
@@ -221,8 +240,37 @@ export function useSpeechFollower({
     status,
     transcript,
     matchingTranscript,
+    matchedWordCount,
     error,
   }
+}
+
+function parseVoiceCommand(value: string): 'next' | 'previous' | 'reset' | 'pause' | null {
+  const words = normalizeText(value).split(/\s+/).filter(Boolean)
+
+  if (words[0] !== 'flow' || words.length > 4) {
+    return null
+  }
+
+  const command = words.slice(1).join(' ')
+
+  if (/^(avanza|avanzar|siguiente|linea siguiente|next)$/.test(command)) {
+    return 'next'
+  }
+
+  if (/^(atras|anterior|retrocede|linea anterior|previous|back)$/.test(command)) {
+    return 'previous'
+  }
+
+  if (/^(reinicia|reiniciar|inicio|reset)$/.test(command)) {
+    return 'reset'
+  }
+
+  if (/^(pausa|pausar|pause)$/.test(command)) {
+    return 'pause'
+  }
+
+  return null
 }
 
 function isRecoverableSpeechError(error: string) {
