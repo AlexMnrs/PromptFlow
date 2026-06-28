@@ -112,6 +112,7 @@ To publish the PWA with GitHub Pages, enable Pages with GitHub Actions or deploy
 - `node_modules/`, `dist/`, `.tools/`, `.env*`, logs, and `*.tsbuildinfo` files are ignored.
 - There is no automated test suite beyond linting and production builds yet.
 - The project is released under the MIT License.
+- Security and privacy guidance is documented in [SECURITY.md](SECURITY.md).
 
 ## Contributing
 

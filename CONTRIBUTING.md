@@ -51,6 +51,8 @@ npm run build
 
 There is no automated test suite beyond linting and production builds yet. If your change affects browser APIs such as camera, microphone, recording, wake lock, sharing, or speech recognition, include the browsers and devices you tested manually.
 
+If your change affects privacy-sensitive behavior, also read [SECURITY.md](SECURITY.md) before opening a PR.
+
 ## Pull Request Guidelines
 
 Please keep pull requests small and easy to review.
