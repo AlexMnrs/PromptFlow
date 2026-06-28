@@ -117,6 +117,8 @@ To publish the PWA with GitHub Pages, enable Pages with GitHub Actions or deploy
 
 Small, focused improvements are welcome. Good first areas include documentation clarity, browser compatibility notes, mobile layout fixes, and lightweight tests around the main user workflow.
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, pull request guidelines, and browser testing notes.
+
 Before proposing a change, please run:
 
 ```bash
