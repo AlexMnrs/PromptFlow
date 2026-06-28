@@ -39,8 +39,6 @@ export function useSpeechFollower({
   const trackingActiveRef = useRef(trackingActive)
   const restartTimerRef = useRef<number | null>(null)
   const networkErrorCountRef = useRef(0)
-  const sessionStartedAtRef = useRef(0)
-  const sessionHadResultRef = useRef(false)
   const transcriptBufferRef = useRef('')
   const matchedWordCountRef = useRef(0)
 
@@ -103,7 +101,7 @@ export function useSpeechFollower({
     }
 
     const recognition = new Recognition()
-    recognition.continuous = !isAndroidBrowser()
+    recognition.continuous = true
     recognition.interimResults = true
     recognition.lang = language
     recognitionRef.current = recognition
@@ -111,8 +109,6 @@ export function useSpeechFollower({
     networkErrorCountRef.current = 0
 
     recognition.onstart = () => {
-      sessionStartedAtRef.current = Date.now()
-      sessionHadResultRef.current = false
       setStatus('listening')
       setError('')
     }
@@ -151,15 +147,6 @@ export function useSpeechFollower({
 
     recognition.onend = () => {
       if (shouldListenRef.current) {
-        const endedQuicklyWithoutResults = isAndroidBrowser() && !sessionHadResultRef.current && Date.now() - sessionStartedAtRef.current < 2500
-
-        if (endedQuicklyWithoutResults) {
-          shouldListenRef.current = false
-          setStatus('error')
-          setError('Android ha cerrado el reconocimiento de voz al iniciarlo. Prueba Chrome o desactiva permisos de microfono/camara abiertos en otras apps.')
-          return
-        }
-
         restartTimerRef.current = window.setTimeout(() => {
           restartTimerRef.current = null
 
@@ -180,7 +167,6 @@ export function useSpeechFollower({
     }
 
     recognition.onresult = (event) => {
-      sessionHadResultRef.current = true
       let spoken = ''
       let finalSpoken = ''
 
@@ -299,10 +285,6 @@ function parseVoiceCommand(value: string): 'next' | 'previous' | 'reset' | 'paus
 
 function isRecoverableSpeechError(error: string) {
   return error === 'network' || error === 'no-speech'
-}
-
-function isAndroidBrowser() {
-  return /Android/i.test(navigator.userAgent)
 }
 
 function speechErrorText(error: string) {
