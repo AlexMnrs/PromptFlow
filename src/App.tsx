@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
   ArrowLeftRight,
+  Camera,
+  CameraOff,
   Check,
+  CircleDot,
   Copy,
   Download,
   Eye,
@@ -718,7 +721,6 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
           zoom={settings.zoom}
           cameraFacing={settings.cameraFacing}
           onRequestMedia={requestMedia}
-          onStopMedia={stopMedia}
         />
 
         <ScriptPane
@@ -814,6 +816,13 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
           onClick={() => onSettingsChange({ splitOrder: settings.splitOrder === 'script-first' ? 'camera-first' : 'script-first' })}
         />
         <IconButton
+          icon={hasCamera ? CameraOff : Camera}
+          label={hasCamera ? 'Detener camara' : 'Activar camara'}
+          active={hasCamera}
+          disabled={isRecording || countdown > 0}
+          onClick={hasCamera ? stopMedia : () => void requestMedia()}
+        />
+        <IconButton
           icon={SwitchCamera}
           label="Cambiar camara frontal o trasera"
           active={settings.cameraFacing === 'environment'}
@@ -822,7 +831,7 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
         />
         <IconButton icon={RefreshCcw} label="Alternar espejo" active={settings.mirror} onClick={() => onSettingsChange({ mirror: !settings.mirror })} />
         <IconButton
-          icon={isRecording || countdown > 0 ? Square : Video}
+          icon={isRecording || countdown > 0 ? Square : CircleDot}
           label={isRecording ? 'Detener grabacion' : countdown > 0 ? 'Cancelar cuenta atras' : 'Grabar'}
           active={isRecording || countdown > 0}
           variant={isRecording || countdown > 0 ? 'danger' : 'glass'}
@@ -868,10 +877,9 @@ interface CameraPaneProps {
   zoom: number
   cameraFacing: 'user' | 'environment'
   onRequestMedia: () => Promise<MediaStream | null>
-  onStopMedia: () => void
 }
 
-function CameraPane({ videoRef, hasCamera, permission, mediaError, mirror, zoomMode, zoom, cameraFacing, onRequestMedia, onStopMedia }: CameraPaneProps) {
+function CameraPane({ videoRef, hasCamera, permission, mediaError, mirror, zoomMode, zoom, cameraFacing, onRequestMedia }: CameraPaneProps) {
   const shouldShowPermissionCard = !hasCamera && permission !== 'idle'
 
   return (
@@ -887,11 +895,6 @@ function CameraPane({ videoRef, hasCamera, permission, mediaError, mirror, zoomM
             Activar
           </button>
         </div>
-      )}
-      {hasCamera && (
-        <button className="camera-stop" type="button" onClick={onStopMedia}>
-          Detener camara
-        </button>
       )}
       <div className="camera-badge">
         {cameraFacing === 'user' ? 'Frontal' : 'Trasera'} · Vista {mirror ? 'espejo' : 'normal'} · {zoom.toFixed(1)}x
