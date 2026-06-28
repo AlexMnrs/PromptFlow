@@ -1,0 +1,44 @@
+name: Bug report
+description: Report something that is not working as expected.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve PromptFlow. Please include enough detail for someone else to reproduce the issue.
+  - type: textarea
+    id: current-behavior
+    attributes:
+      label: What happened?
+      description: Describe the bug and what you expected to happen instead.
+      placeholder: The camera preview...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the exact steps that trigger the issue.
+      placeholder: |
+        1. Open the app
+        2. Start the prompter
+        3. Tap record
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and device
+      description: Include browser, version if known, operating system, and device.
+      placeholder: Safari on iPhone, Chrome on Android, Chrome on desktop...
+    validations:
+      required: true
+  - type: textarea
+    id: extra-context
+    attributes:
+      label: Extra context
+      description: Add screenshots, recordings, console errors, or anything else that may help.
+    validations:
+      required: false
