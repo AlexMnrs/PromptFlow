@@ -458,11 +458,12 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
   )
 
   const speech = useSpeechFollower({
-    enabled: isPlaying && settings.voiceFollow,
+    enabled: settings.voiceFollow,
     language: settings.language,
     lines,
     currentIndex: activeLine,
     commandsEnabled: settings.voiceCommands,
+    trackingActive: isPlaying,
     onLineMatched: moveToLine,
     onCommand: handleVoiceCommand,
   })
@@ -720,7 +721,13 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
           onStopMedia={stopMedia}
         />
 
-        <ScriptPane lines={lines} activeLine={activeLine} lineStep={settings.fontSize * settings.lineHeight + 20} voiceTranscript={speech.matchingTranscript} onLineSelect={moveToLine} />
+        <ScriptPane
+          lines={lines}
+          activeLine={activeLine}
+          lineStep={settings.fontSize * settings.lineHeight + 20}
+          matchedWordCount={speech.matchedWordCount}
+          onLineSelect={moveToLine}
+        />
       </section>
 
       {showChrome && showReadingPanel && (
@@ -865,10 +872,12 @@ interface CameraPaneProps {
 }
 
 function CameraPane({ videoRef, hasCamera, permission, mediaError, mirror, zoomMode, zoom, cameraFacing, onRequestMedia, onStopMedia }: CameraPaneProps) {
+  const shouldShowPermissionCard = !hasCamera && permission !== 'idle'
+
   return (
     <div className={`camera-pane ${mirror ? 'is-mirrored' : ''} ${zoomMode === 'preview' ? 'uses-preview-zoom' : ''}`} aria-label="Vista de camara">
       <video ref={videoRef} autoPlay playsInline muted />
-      {!hasCamera && (
+      {shouldShowPermissionCard && (
         <div className="permission-card">
           <VideoOff aria-hidden="true" size={32} />
           <h3>{permission === 'requesting' ? 'Solicitando permiso' : 'Camara pendiente'}</h3>
@@ -895,12 +904,15 @@ interface ScriptPaneProps {
   lines: string[]
   activeLine: number
   lineStep: number
-  voiceTranscript: string
+  matchedWordCount: number
   onLineSelect: (index: number) => void
 }
 
-function ScriptPane({ lines, activeLine, lineStep, voiceTranscript, onLineSelect }: ScriptPaneProps) {
-  const activeVoiceProgress = useMemo(() => getLineVoiceProgress(lines[activeLine] ?? '', voiceTranscript), [activeLine, lines, voiceTranscript])
+function ScriptPane({ lines, activeLine, lineStep, matchedWordCount, onLineSelect }: ScriptPaneProps) {
+  const activeVoiceProgress = useMemo(
+    () => getLineVoiceProgress(lines[activeLine] ?? '', '', { fixedMatchedWordCount: matchedWordCount }),
+    [activeLine, lines, matchedWordCount],
+  )
 
   return (
     <div className="script-pane" aria-label="Texto del prompter">

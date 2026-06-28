@@ -30,7 +30,15 @@ export function normalizeText(value: string) {
     .trim()
 }
 
-export function findBestLineIndex(lines: string[], transcript: string, currentIndex: number) {
+interface VoiceProgressOptions {
+  cursorWordCount?: number
+  fixedMatchedWordCount?: number
+  allowBacktrack?: boolean
+  maxAdvanceWords?: number
+  minMatchedWordCount?: number
+}
+
+export function findBestLineIndex(lines: string[], transcript: string, currentIndex: number, currentMatchedWordCount = 0) {
   const transcriptWords = toNormalizedWords(transcript).slice(-34)
 
   if (transcriptWords.length < 3) {
@@ -39,11 +47,13 @@ export function findBestLineIndex(lines: string[], transcript: string, currentIn
 
   let bestIndex = currentIndex
   let bestScore = 0
-  const start = Math.max(0, currentIndex - 1)
-  const end = Math.min(lines.length - 1, currentIndex + 3)
+  const start = currentIndex
+  const end = currentIndex
 
   for (let index = start; index <= end; index += 1) {
-    const progress = getLineVoiceProgress(lines[index], transcript)
+    const progress = getLineVoiceProgress(lines[index], transcript, {
+      minMatchedWordCount: index === currentIndex ? currentMatchedWordCount : 0,
+    })
 
     if (progress.wordCount === 0) {
       continue
@@ -61,26 +71,20 @@ export function findBestLineIndex(lines: string[], transcript: string, currentIn
   return bestScore >= 0.3 ? bestIndex : currentIndex
 }
 
-export function findVoiceTargetLine(lines: string[], transcript: string, currentIndex: number) {
-  const currentProgress = getLineVoiceProgress(lines[currentIndex] ?? '', transcript)
-  const nextIndex = currentIndex + 1
-  const nextProgress = getLineVoiceProgress(lines[nextIndex] ?? '', transcript)
-
-  if (nextIndex < lines.length && startsNextLine(nextProgress)) {
-    return nextIndex
-  }
+export function findVoiceTargetLine(lines: string[], transcript: string, currentIndex: number, currentMatchedWordCount = 0) {
+  const currentProgress = getLineVoiceProgress(lines[currentIndex] ?? '', transcript, { fixedMatchedWordCount: currentMatchedWordCount })
 
   if (currentIndex < lines.length - 1 && shouldAdvanceFromLine(currentProgress)) {
     return currentIndex + 1
   }
 
-  return findBestLineIndex(lines, transcript, currentIndex)
+  return findBestLineIndex(lines, transcript, currentIndex, currentProgress.matchedWordCount)
 }
 
-export function getLineVoiceProgress(line: string, transcript: string) {
+export function getLineVoiceProgress(line: string, transcript: string, options: VoiceProgressOptions = {}) {
   const lineWords = toNormalizedWords(line)
   const transcriptWords = toNormalizedWords(transcript).slice(-60)
-  const matchedWordCount = countOrderedPrefixMatches(lineWords, transcriptWords)
+  const matchedWordCount = getMatchedWordCount(lineWords, transcriptWords, options)
   const matchedIndexes = new Set<number>()
 
   for (let index = 0; index < matchedWordCount; index += 1) {
@@ -107,24 +111,103 @@ function toNormalizedWords(value: string) {
   return extractWordTokens(normalizeText(value)).filter(Boolean)
 }
 
-function shouldAdvanceFromLine(progress: ReturnType<typeof getLineVoiceProgress>) {
-  if (progress.wordCount <= 3) {
-    return progress.coverage >= 1
+function getMatchedWordCount(lineWords: string[], transcriptWords: string[], options: VoiceProgressOptions) {
+  if (options.fixedMatchedWordCount !== undefined) {
+    return clamp(options.fixedMatchedWordCount, 0, lineWords.length)
   }
 
-  return progress.coverage >= 0.82 || (progress.coverage >= 0.66 && progress.trailingMatched >= 4)
-}
-
-function startsNextLine(progress: ReturnType<typeof getLineVoiceProgress>) {
-  if (progress.wordCount === 0) {
-    return false
+  if (options.cursorWordCount !== undefined) {
+    return findNearbyPhraseEnd(lineWords, transcriptWords, options)
   }
 
-  return progress.matchedWordCount >= Math.min(3, progress.wordCount) || progress.coverage >= 0.32
+  const minMatchedWordCount = clamp(options.minMatchedWordCount ?? 0, 0, lineWords.length)
+
+  return countOrderedPrefixMatches(lineWords, transcriptWords, minMatchedWordCount)
 }
 
-function countOrderedPrefixMatches(lineWords: string[], transcriptWords: string[]) {
+function findNearbyPhraseEnd(lineWords: string[], transcriptWords: string[], options: VoiceProgressOptions) {
+  const cursor = clamp(options.cursorWordCount ?? 0, 0, lineWords.length)
+  const spokenWords = transcriptWords.slice(-8)
+
+  if (spokenWords.length === 0 || lineWords.length === 0) {
+    return cursor
+  }
+
+  const backtrack = options.allowBacktrack ? lineWords.length : 0
+  const searchStart = Math.max(0, cursor - backtrack)
+  const searchEnd = Math.min(lineWords.length - 1, cursor + 8)
+  let bestEnd = cursor
+  let bestScore = 0
+
+  for (let start = searchStart; start <= searchEnd; start += 1) {
+    const matched = countConsecutiveMatches(lineWords, spokenWords, start)
+
+    if (matched === 0) {
+      continue
+    }
+
+    const end = start + matched
+    const distance = Math.abs(start - cursor)
+    const score = matched * 2 - distance * 0.2
+
+    if (score > bestScore) {
+      bestEnd = end
+      bestScore = score
+    }
+  }
+
+  if (bestScore === 0) {
+    return findNearbySpokenWordEnd(lineWords, spokenWords, cursor, options)
+  }
+
+  if (bestEnd > cursor && options.maxAdvanceWords !== undefined) {
+    return Math.min(bestEnd, cursor + options.maxAdvanceWords)
+  }
+
+  return bestEnd
+}
+
+function findNearbySpokenWordEnd(lineWords: string[], spokenWords: string[], cursor: number, options: VoiceProgressOptions) {
+  const spokenSet = new Set(spokenWords)
+  const searchEnd = Math.min(lineWords.length - 1, cursor + 5)
+
+  for (let index = cursor; index <= searchEnd; index += 1) {
+    if (spokenSet.has(lineWords[index])) {
+      const matchedEnd = index + 1
+
+      if (matchedEnd > cursor && options.maxAdvanceWords !== undefined) {
+        return Math.min(matchedEnd, cursor + options.maxAdvanceWords)
+      }
+
+      return matchedEnd
+    }
+  }
+
+  return cursor
+}
+
+function countConsecutiveMatches(lineWords: string[], transcriptWords: string[], lineStart: number) {
   let matched = 0
+
+  for (const transcriptWord of transcriptWords) {
+    const lineIndex = lineStart + matched
+
+    if (lineIndex >= lineWords.length || lineWords[lineIndex] !== transcriptWord) {
+      break
+    }
+
+    matched += 1
+  }
+
+  return matched
+}
+
+function shouldAdvanceFromLine(progress: ReturnType<typeof getLineVoiceProgress>) {
+  return progress.wordCount > 0 && progress.matchedWordCount >= progress.wordCount
+}
+
+function countOrderedPrefixMatches(lineWords: string[], transcriptWords: string[], startIndex = 0) {
+  let matched = startIndex
 
   for (const transcriptWord of transcriptWords) {
     if (matched >= lineWords.length) {
