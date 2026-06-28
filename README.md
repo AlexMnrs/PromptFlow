@@ -1,12 +1,56 @@
 # PromptFlow
 
-PromptFlow is a mobile-first teleprompter PWA for recording yourself while reading a script. It combines large readable text, camera preview, browser recording, and optional voice-following when the browser supports it.
+PromptFlow is a mobile-first teleprompter PWA for recording yourself while reading a script. It combines large readable text, camera preview, browser recording, local script storage, and optional voice-following when the browser supports it.
 
 **Live app:** [alexmnrs.github.io/PromptFlow](https://alexmnrs.github.io/PromptFlow/)
 
+## Why It Exists
+
+Recording a clear take from a phone or laptop is harder than it should be: the script is usually in one place, the camera in another, and rerecording breaks concentration. PromptFlow keeps the script, camera preview, recording controls, and review flow together in one browser-based workspace.
+
+Use it for:
+
+- Short tutorials and product walkthroughs.
+- Social video scripts.
+- Course intros and lesson recordings.
+- Internal updates where reading cleanly matters.
+- Rehearsing talks without installing heavy desktop software.
+
 ## Status
 
-PromptFlow is currently a functional MVP. The main recording and reading workflow is already implemented, with graceful fallbacks for browser features that are not available everywhere.
+PromptFlow is a functional MVP. The main reading and recording workflow is implemented, the app is installable as a PWA, and unsupported browser features degrade to manual controls instead of blocking the session.
+
+The project is currently focused on reliability, mobile usability, browser compatibility, and clearer documentation.
+
+## Quick Start
+
+Try the hosted version first:
+
+1. Open [alexmnrs.github.io/PromptFlow](https://alexmnrs.github.io/PromptFlow/).
+2. Create or paste a script.
+3. Allow camera and microphone access when prompted.
+4. Choose overlay or split-screen mode.
+5. Start reading, record a take, review it, and download the result.
+
+Run locally:
+
+```bash
+npm install
+npm run dev
+```
+
+Run checks before opening a pull request:
+
+```bash
+npm run lint
+npm run build
+```
+
+Preview the production build:
+
+```bash
+npm run preview
+```
 
 ## Features
 
@@ -38,32 +82,22 @@ If voice-following is not supported, the app still provides large manual control
 
 Recording captures the camera and microphone stream. The prompter text is used as an on-screen reading guide and is not burned into the exported video.
 
-## Getting Started
+## Project Roadmap
 
-Recommended requirements:
+Near-term improvements:
 
-- Node.js 24, matching the CI workflow.
-- npm.
+- Add screenshots or a short demo GIF to the README.
+- Improve mobile layout testing across common viewport sizes.
+- Add a lightweight smoke test for the main script and recording workflow.
+- Expand browser compatibility notes with tested browser/device combinations.
+- Improve issue labels and contributor-friendly tasks.
 
-Install dependencies and start the local development server:
+Later ideas:
 
-```bash
-npm install
-npm run dev
-```
-
-Run local checks:
-
-```bash
-npm run lint
-npm run build
-```
-
-Preview the production build:
-
-```bash
-npm run preview
-```
+- Script templates for common recording formats.
+- Better keyboard shortcuts for desktop recording.
+- Optional export/import bundles for script collections.
+- More polished recording review and retake management.
 
 ## Deployment
 
@@ -76,11 +110,20 @@ To publish the PWA with GitHub Pages, enable Pages with GitHub Actions or deploy
 ## Public Repository Notes
 
 - `node_modules/`, `dist/`, `.tools/`, `.env*`, logs, and `*.tsbuildinfo` files are ignored.
-- There is no automated test suite beyond linting and production builds.
+- There is no automated test suite beyond linting and production builds yet.
 - The project is released under the MIT License.
+
+## Contributing
+
+Small, focused improvements are welcome. Good first areas include documentation clarity, browser compatibility notes, mobile layout fixes, and lightweight tests around the main user workflow.
+
+Before proposing a change, please run:
+
+```bash
+npm run lint
+npm run build
+```
 
 ## License
 
 [MIT](LICENSE)
-
-<p align="center">Made with ❤️</p>
