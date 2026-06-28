@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowLeftRight,
   Camera,
@@ -55,6 +56,7 @@ function App() {
   const [view, setView] = useState<AppView>('library')
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('Guardado')
   const importInputRef = useRef<HTMLInputElement | null>(null)
+  const isAndroid = useMemo(() => isAndroidBrowser(), [])
   const selectedScript = useMemo(
     () => appState.scripts.find((script) => script.id === appState.selectedScriptId) ?? appState.scripts[0],
     [appState.scripts, appState.selectedScriptId],
@@ -218,6 +220,7 @@ function App() {
           <LibraryPanel
             scripts={appState.scripts}
             selectedScript={selectedScript}
+            showAndroidWarning={isAndroid}
             onCreate={createNewScript}
             onImport={() => importInputRef.current?.click()}
             onOpen={(id) => selectScript(id, 'editor')}
@@ -230,6 +233,7 @@ function App() {
             script={selectedScript}
             settings={appState.settings}
             saveStatus={saveStatus}
+            showAndroidWarning={isAndroid}
             onPatch={updateSelectedScript}
             onPrompt={() => setView('prompter')}
             onDuplicate={duplicateScript}
@@ -243,6 +247,7 @@ function App() {
           <PrompterPanel
             script={selectedScript}
             settings={appState.settings}
+            showAndroidWarning={isAndroid}
             onSettingsChange={updateSettings}
             onScriptPatch={updateSelectedScript}
             onBack={() => setView('editor')}
@@ -275,13 +280,14 @@ function ScriptList({ scripts, selectedId, onSelect }: ScriptListProps) {
 interface LibraryPanelProps {
   scripts: ScriptItem[]
   selectedScript: ScriptItem
+  showAndroidWarning: boolean
   onCreate: () => void
   onImport: () => void
   onOpen: (id: string) => void
   onPrompt: (id: string) => void
 }
 
-function LibraryPanel({ scripts, selectedScript, onCreate, onImport, onOpen, onPrompt }: LibraryPanelProps) {
+function LibraryPanel({ scripts, selectedScript, showAndroidWarning, onCreate, onImport, onOpen, onPrompt }: LibraryPanelProps) {
   return (
     <div className="panel library-panel">
       <div className="panel-header">
@@ -294,6 +300,8 @@ function LibraryPanel({ scripts, selectedScript, onCreate, onImport, onOpen, onP
           <IconButton icon={FilePlus2} label="Crear guion" onClick={onCreate} variant="solid" />
         </div>
       </div>
+
+      {showAndroidWarning && <AndroidSpeechWarning />}
 
       <div className="script-grid">
         {scripts.map((script) => (
@@ -326,6 +334,7 @@ interface EditorPanelProps {
   script: ScriptItem
   settings: PrompterSettings
   saveStatus: SaveStatus
+  showAndroidWarning: boolean
   onPatch: (patch: Partial<ScriptItem>) => void
   onPrompt: () => void
   onDuplicate: () => void
@@ -334,7 +343,7 @@ interface EditorPanelProps {
   onOpenLibrary: () => void
 }
 
-function EditorPanel({ script, settings, saveStatus, onPatch, onPrompt, onDuplicate, onDelete, onExport, onOpenLibrary }: EditorPanelProps) {
+function EditorPanel({ script, settings, saveStatus, showAndroidWarning, onPatch, onPrompt, onDuplicate, onDelete, onExport, onOpenLibrary }: EditorPanelProps) {
   const wordCount = useMemo(() => script.body.trim().split(/\s+/).filter(Boolean).length, [script.body])
 
   return (
@@ -351,6 +360,8 @@ function EditorPanel({ script, settings, saveStatus, onPatch, onPrompt, onDuplic
           <IconButton icon={Trash2} label="Eliminar guion" onClick={onDelete} variant="danger" />
         </div>
       </div>
+
+      {showAndroidWarning && <AndroidSpeechWarning />}
 
       <div className="editor-layout">
         <section className="editor-card">
@@ -401,12 +412,13 @@ function EditorPanel({ script, settings, saveStatus, onPatch, onPrompt, onDuplic
 interface PrompterPanelProps {
   script: ScriptItem
   settings: PrompterSettings
+  showAndroidWarning: boolean
   onSettingsChange: (patch: Partial<PrompterSettings>) => void
   onScriptPatch: (patch: Partial<ScriptItem>) => void
   onBack: () => void
 }
 
-function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBack }: PrompterPanelProps) {
+function PrompterPanel({ script, settings, showAndroidWarning, onSettingsChange, onScriptPatch, onBack }: PrompterPanelProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
@@ -768,6 +780,8 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
         </aside>
       )}
 
+      {showChrome && showAndroidWarning && settings.voiceFollow && <AndroidSpeechWarning className="prompter-warning" compact />}
+
       {countdown > 0 && (
         <div className="countdown-overlay" aria-live="assertive" aria-label={`Grabacion en ${countdown}`}>
           <span>{countdown}</span>
@@ -959,8 +973,29 @@ function HighlightedLine({ line, matchedIndexes }: HighlightedLineProps) {
   )
 }
 
+interface AndroidSpeechWarningProps {
+  className?: string
+  compact?: boolean
+}
+
+function AndroidSpeechWarning({ className = '', compact = false }: AndroidSpeechWarningProps) {
+  return (
+    <aside className={`android-warning ${className}`} role="note" aria-label="Aviso sobre reconocimiento de voz en Android">
+      <AlertTriangle aria-hidden="true" size={compact ? 18 : 22} />
+      <div>
+        <strong>Reconocimiento de voz limitado en Android</strong>
+        {!compact && <p>En algunos dispositivos y navegadores Android, el microfono puede activarse y detenerse repetidamente. Si ocurre, usa los controles manuales o prueba iOS, Safari o escritorio.</p>}
+      </div>
+    </aside>
+  )
+}
+
 function previewText(body: string) {
   return body.trim().replace(/\s+/g, ' ').slice(0, 124) || 'Guion vacio. Abre el editor para empezar.'
+}
+
+function isAndroidBrowser() {
+  return typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent)
 }
 
 function nextTheme(theme: PrompterSettings['theme']): PrompterSettings['theme'] {
