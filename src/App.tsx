@@ -431,6 +431,7 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
   const [zoomMode, setZoomMode] = useState<'hardware' | 'preview'>('preview')
   const wakeLockStatus = useWakeLock(keepAwake && (isPlaying || isRecording || countdown > 0))
   const progress = Math.round(((activeLine + 1) / lines.length) * 100)
+  const speechEnabled = settings.voiceFollow && (!isAndroidBrowser() || isPlaying)
 
   const moveToLine = useCallback(
     (index: number) => {
@@ -461,7 +462,7 @@ function PrompterPanel({ script, settings, onSettingsChange, onScriptPatch, onBa
   )
 
   const speech = useSpeechFollower({
-    enabled: settings.voiceFollow,
+    enabled: speechEnabled,
     language: settings.language,
     lines,
     currentIndex: activeLine,
@@ -956,6 +957,10 @@ function HighlightedLine({ line, matchedIndexes }: HighlightedLineProps) {
       })}
     </>
   )
+}
+
+function isAndroidBrowser() {
+  return /Android/i.test(navigator.userAgent)
 }
 
 function previewText(body: string) {
