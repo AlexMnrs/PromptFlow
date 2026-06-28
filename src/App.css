@@ -114,7 +114,6 @@
 .primary-action,
 .secondary-action,
 .record-launch,
-.camera-stop,
 .status-button {
   min-height: 44px;
   border: 0;
@@ -136,8 +135,7 @@
   background: var(--accent);
 }
 
-.secondary-action,
-.camera-stop {
+.secondary-action {
   color: var(--text);
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -436,7 +434,6 @@
 .prompter-stage.chrome-hidden .reading-panel,
 .prompter-stage.chrome-hidden .take-review,
 .prompter-stage.chrome-hidden .status-strip,
-.prompter-stage.chrome-hidden .camera-stop,
 .prompter-stage.chrome-hidden .camera-badge {
   display: none;
 }
@@ -543,16 +540,10 @@
   color: var(--muted);
 }
 
-.camera-stop,
 .camera-badge {
   position: absolute;
   z-index: 4;
   right: 16px;
-}
-
-.camera-stop {
-  top: 88px;
-  right: calc(14px + min(240px, calc(100vw - 28px)) + 18px);
 }
 
 .camera-badge {
@@ -979,10 +970,6 @@
   .script-line {
     padding-inline: 10px;
     font-size: clamp(24px, var(--prompter-font-size), 42px);
-  }
-
-  .camera-stop {
-    display: none;
   }
 
   .permission-card {
