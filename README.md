@@ -1,78 +1,86 @@
 # PromptFlow
 
-PromptFlow es una PWA de teleprompter pensada para uso movil, especialmente en iPhone. Permite preparar guiones, leer con texto grande, usar la camara como referencia, grabar la toma y activar seguimiento por voz cuando el navegador lo soporte.
+PromptFlow is a mobile-first teleprompter PWA for recording yourself while reading a script. It combines large readable text, camera preview, browser recording, and optional voice-following when the browser supports it.
 
-**App publicada:** https://alexmnrs.github.io/PromptFlow/
+**Live app:** [alexmnrs.github.io/PromptFlow](https://alexmnrs.github.io/PromptFlow/)
 
-## Estado
+## Status
 
-La aplicacion esta en estado funcional/MVP. El flujo principal ya esta implementado:
+PromptFlow is currently a functional MVP. The main recording and reading workflow is already implemented, with graceful fallbacks for browser features that are not available everywhere.
 
-- Crear, editar, duplicar, eliminar, importar y exportar guiones.
-- Guardado local automatico en `localStorage`.
-- Prompter con modo overlay y modo split.
-- Cambio de orden en split: texto/camara o camara/texto.
-- Cambio entre camara frontal y trasera cuando el dispositivo lo permite.
-- Controles de lectura: play/pausa, reinicio, linea anterior/siguiente, tamano, velocidad, idioma y zoom.
-- Camara con vista espejo y zoom por hardware cuando el navegador lo permita; si no, zoom de previsualizacion.
-- Cuenta atras antes de grabar, grabacion con `MediaRecorder` y descarga de la toma.
-- Revision rapida de la toma grabada con opcion de compartir cuando el navegador lo permite.
-- Wake Lock opcional para mantener la pantalla despierta durante lectura o grabacion.
-- Seguimiento por voz opcional con fallback manual.
-- Manifest y service worker para uso instalable/offline.
+## Features
 
-## Requisitos y soporte
+- Create, edit, duplicate, delete, import, and export scripts.
+- Automatic local saving with `localStorage`.
+- Teleprompter view with overlay and split-screen layouts.
+- Switch split-screen order between script-first and camera-first.
+- Switch between front and rear cameras when the device allows it.
+- Reading controls for play/pause, restart, previous/next line, font size, speed, language, and zoom.
+- Mirrored camera preview and hardware zoom when supported, with preview zoom as a fallback.
+- Recording countdown, in-browser recording with `MediaRecorder`, and local download.
+- Quick review of the recorded take, plus native sharing when supported.
+- Optional Wake Lock to keep the screen awake while reading or recording.
+- Optional voice-following with large manual controls as a fallback.
+- Installable/offline PWA support through the manifest and service worker.
 
-Camara, microfono, grabacion y reconocimiento de voz requieren contexto seguro. En produccion usa HTTPS. En desarrollo local puedes abrir la app en el equipo; para probar en un iPhone real conviene usar una URL HTTPS, por ejemplo mediante un tunel.
+## Browser Support
 
-El soporte depende del navegador:
+Camera, microphone, recording, and speech recognition require a secure context. Use HTTPS in production. For local development, `localhost` works; for testing on a real iPhone, an HTTPS tunnel is usually the easiest path.
 
-- `getUserMedia` es necesario para camara y microfono.
-- `MediaRecorder` es necesario para grabar desde el navegador.
-- `SpeechRecognition`/`webkitSpeechRecognition` es necesario para el seguimiento por voz.
-- `Wake Lock` y `navigator.share` son opcionales; la app sigue funcionando sin ellos.
+PromptFlow uses these browser APIs:
 
-Si el seguimiento por voz no esta disponible, la app mantiene controles manuales grandes para avanzar, retroceder y pausar.
+- `getUserMedia` for camera and microphone access.
+- `MediaRecorder` for recording in the browser.
+- `SpeechRecognition` or `webkitSpeechRecognition` for voice-following.
+- Wake Lock and `navigator.share` as optional enhancements.
 
-La grabacion guarda el stream de camara/microfono. El texto del prompter sirve como guia de lectura en pantalla y no se incrusta automaticamente en el video.
+If voice-following is not supported, the app still provides large manual controls to move through the script.
 
-## Desarrollo
+Recording captures the camera and microphone stream. The prompter text is used as an on-screen reading guide and is not burned into the exported video.
 
-Requisitos recomendados:
+## Getting Started
 
-- Node.js 24, igual que el workflow de CI.
+Recommended requirements:
+
+- Node.js 24, matching the CI workflow.
 - npm.
 
-Instalacion y servidor local:
+Install dependencies and start the local development server:
 
 ```bash
 npm install
 npm run dev
 ```
 
-Verificaciones locales:
+Run local checks:
 
 ```bash
 npm run lint
 npm run build
 ```
 
-Previsualizacion del build:
+Preview the production build:
 
 ```bash
 npm run preview
 ```
 
-## Publicacion
+## Deployment
 
-El proyecto usa Vite con `base: './'`, por lo que el build generado en `dist/` es compatible con despliegues en subrutas como GitHub Pages.
+The project uses Vite with `base: './'`, so the generated `dist/` build works well on subpath deployments such as GitHub Pages.
 
-El workflow `.github/workflows/ci.yml` ejecuta `npm ci`, `npm run lint` y `npm run build` en cada push o pull request contra `main`.
+The CI workflow in `.github/workflows/ci.yml` runs `npm ci`, `npm run lint`, and `npm run build` on every push or pull request targeting `main`.
 
-Para publicar la PWA con GitHub Pages, activa Pages con GitHub Actions o despliega el contenido de `dist/` desde el workflow que prefieras.
+To publish the PWA with GitHub Pages, enable Pages with GitHub Actions or deploy the contents of `dist/` from the workflow you prefer.
 
-## Notas para repositorio publico
+## Public Repository Notes
 
-- `node_modules/`, `dist/`, `.tools/`, `.env*`, logs y archivos `*.tsbuildinfo` estan ignorados.
-- No hay suite de tests automatizados mas alla de lint y build.
-- El proyecto se publica bajo licencia MIT.
+- `node_modules/`, `dist/`, `.tools/`, `.env*`, logs, and `*.tsbuildinfo` files are ignored.
+- There is no automated test suite beyond linting and production builds.
+- The project is released under the MIT License.
+
+## License
+
+[MIT](LICENSE)
+
+<p align="center">Made with ❤️</p>
