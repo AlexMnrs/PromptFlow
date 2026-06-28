@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   ArrowLeft,
@@ -835,7 +835,6 @@ function PrompterPanel({ script, settings, showAndroidWarning, onSettingsChange,
         <ScriptPane
           lines={lines}
           activeLine={activeLine}
-          lineStep={settings.fontSize * settings.lineHeight + 20}
           matchedWordCount={speech.matchedWordCount}
           onLineSelect={moveToLine}
         />
@@ -1018,23 +1017,56 @@ function CameraPane({ videoRef, hasCamera, permission, mediaError, mirror, zoomM
 interface ScriptPaneProps {
   lines: string[]
   activeLine: number
-  lineStep: number
   matchedWordCount: number
   onLineSelect: (index: number) => void
 }
 
-function ScriptPane({ lines, activeLine, lineStep, matchedWordCount, onLineSelect }: ScriptPaneProps) {
+function ScriptPane({ lines, activeLine, matchedWordCount, onLineSelect }: ScriptPaneProps) {
+  const trackRef = useRef<HTMLDivElement | null>(null)
+  const lineRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const [activeLineOffset, setActiveLineOffset] = useState(0)
   const activeVoiceProgress = useMemo(
     () => getLineVoiceProgress(lines[activeLine] ?? '', '', { fixedMatchedWordCount: matchedWordCount }),
     [activeLine, lines, matchedWordCount],
   )
+  const measureActiveLine = useCallback(() => {
+    setActiveLineOffset(lineRefs.current[activeLine]?.offsetTop ?? 0)
+  }, [activeLine])
+
+  useLayoutEffect(() => {
+    measureActiveLine()
+  }, [lines, matchedWordCount, measureActiveLine])
+
+  useEffect(() => {
+    const track = trackRef.current
+
+    if (!track || !window.ResizeObserver) {
+      return undefined
+    }
+
+    const observer = new ResizeObserver(measureActiveLine)
+    observer.observe(track)
+
+    return () => observer.disconnect()
+  }, [lines, measureActiveLine])
 
   return (
     <div className="script-pane" aria-label="Prompter text">
-      <div className="script-track" style={{ transform: `translateY(calc(var(--active-offset) - ${activeLine * lineStep}px))` }}>
+      <div
+        ref={trackRef}
+        className="script-track"
+        style={
+          {
+            '--active-line-offset': `${activeLineOffset}px`,
+          } as React.CSSProperties
+        }
+      >
         {lines.map((line, index) => (
           <button
             key={`${line}-${index}`}
+            ref={(element) => {
+              lineRefs.current[index] = element
+            }}
             type="button"
             className={`script-line ${index === activeLine ? 'is-active' : ''}`}
             aria-current={index === activeLine ? 'true' : undefined}
