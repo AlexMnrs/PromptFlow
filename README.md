@@ -4,6 +4,12 @@ PromptFlow is a mobile-first teleprompter PWA for recording yourself while readi
 
 **Live app:** [alexmnrs.github.io/PromptFlow](https://alexmnrs.github.io/PromptFlow/)
 
+## Screenshots
+
+![PromptFlow script library](docs/images/promptflow-library.png)
+
+![PromptFlow teleprompter view](docs/images/promptflow-prompter.png)
+
 ## Why It Exists
 
 Recording a clear take from a phone or laptop is harder than it should be: the script is usually in one place, the camera in another, and rerecording breaks concentration. PromptFlow keeps the script, camera preview, recording controls, and review flow together in one browser-based workspace.
@@ -86,7 +92,6 @@ Recording captures the camera and microphone stream. The prompter text is used a
 
 Near-term improvements:
 
-- Add screenshots or a short demo GIF to the README.
 - Improve mobile layout testing across common viewport sizes.
 - Add a lightweight smoke test for the main script and recording workflow.
 - Expand browser compatibility notes with tested browser/device combinations.
