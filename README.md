@@ -61,7 +61,7 @@ npm run preview
 
 ## Features
 
-- Create, edit, duplicate, delete, import, and export scripts.
+- Create, edit, duplicate, delete, import scripts, export plain text, and export JSON backups.
 - Automatic local saving with `localStorage`.
 - Teleprompter view with overlay and split-screen layouts.
 - Switch split-screen order between script-first and camera-first.
@@ -104,7 +104,7 @@ Later ideas:
 
 - Script templates for common recording formats.
 - Better keyboard shortcuts for desktop recording.
-- Optional export/import bundles for script collections.
+- Optional backup bundles for full script collections.
 - More polished recording review and retake management.
 
 ## Deployment

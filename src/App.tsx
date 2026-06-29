@@ -48,6 +48,7 @@ import { useMediaController } from './hooks/useMediaController'
 import { useSpeechFollower } from './hooks/useSpeechFollower'
 import { useWakeLock } from './hooks/useWakeLock'
 import { clamp, estimateMinutes, fileNameForScript, formatDuration, getLineVoiceProgress, splitScript } from './lib/prompter'
+import { createScriptBackup, parseScriptBackup } from './lib/scriptBackup'
 import { loadState, saveState } from './lib/storage'
 import type { AppState, AppView, PrompterSettings, SaveStatus, ScriptItem } from './types'
 
@@ -55,6 +56,7 @@ function App() {
   const [appState, setAppState] = useState<AppState>(() => loadState())
   const [view, setView] = useState<AppView>('library')
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('Saved')
+  const [importError, setImportError] = useState('')
   const importInputRef = useRef<HTMLInputElement | null>(null)
   const isAndroid = useMemo(() => isAndroidBrowser(), [])
   const selectedScript = useMemo(
@@ -109,6 +111,7 @@ function App() {
 
   const createNewScript = useCallback(() => {
     const script = createScript()
+    setImportError('')
     setAppState((current) => ({
       ...current,
       scripts: [script, ...current.scripts],
@@ -157,24 +160,38 @@ function App() {
     downloadBlob(new Blob([selectedScript.body], { type: 'text/plain;charset=utf-8' }), fileNameForScript(selectedScript, 'txt'))
   }, [selectedScript])
 
+  const exportSelectedScriptBackup = useCallback(() => {
+    if (!selectedScript) {
+      return
+    }
+
+    downloadBlob(new Blob([createScriptBackup(selectedScript)], { type: 'application/json;charset=utf-8' }), fileNameForScript(selectedScript, 'json'))
+  }, [selectedScript])
+
   const handleImportFile = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ''
+    setImportError('')
 
     if (!file) {
       return
     }
 
-    const text = await file.text()
-    const title = file.name.replace(/\.[^.]+$/, '') || 'Imported script'
-    const script = createScript(title, text.trim())
+    try {
+      const text = await file.text()
+      const isJson = file.name.toLowerCase().endsWith('.json') || file.type === 'application/json'
+      const title = file.name.replace(/\.[^.]+$/, '') || 'Imported script'
+      const script = isJson ? parseScriptBackup(text) : createScript(title, text.trim())
 
-    setAppState((current) => ({
-      ...current,
-      scripts: [script, ...current.scripts],
-      selectedScriptId: script.id,
-    }))
-    setView('editor')
+      setAppState((current) => ({
+        ...current,
+        scripts: [script, ...current.scripts],
+        selectedScriptId: script.id,
+      }))
+      setView('editor')
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : 'The selected file could not be imported.')
+    }
   }, [])
 
   if (!selectedScript) {
@@ -183,7 +200,7 @@ function App() {
 
   return (
     <main className={`app-shell theme-${appState.settings.theme} view-${view}`}>
-      <input ref={importInputRef} className="visually-hidden" type="file" accept=".txt,.md,text/plain,text/markdown" onChange={handleImportFile} />
+      <input ref={importInputRef} className="visually-hidden" type="file" accept=".txt,.md,.json,text/plain,text/markdown,application/json" onChange={handleImportFile} />
 
       <aside className="library-rail" aria-label="Script library">
         <div className="brand-lockup">
@@ -208,6 +225,11 @@ function App() {
         </div>
 
         <ScriptList scripts={appState.scripts} selectedId={selectedScript.id} onSelect={(id) => selectScript(id, 'editor')} />
+        {importError && (
+          <p className="rail-error" role="alert">
+            {importError}
+          </p>
+        )}
 
         <div className="rail-status" role="status" aria-live="polite">
           <Save aria-hidden="true" size={16} />
@@ -221,6 +243,7 @@ function App() {
             scripts={appState.scripts}
             selectedScript={selectedScript}
             showAndroidWarning={isAndroid}
+            importError={importError}
             onCreate={createNewScript}
             onImport={() => importInputRef.current?.click()}
             onOpen={(id) => selectScript(id, 'editor')}
@@ -239,6 +262,7 @@ function App() {
             onDuplicate={duplicateScript}
             onDelete={deleteSelectedScript}
             onExport={exportSelectedScript}
+            onExportBackup={exportSelectedScriptBackup}
             onOpenLibrary={() => setView('library')}
           />
         )}
@@ -281,13 +305,14 @@ interface LibraryPanelProps {
   scripts: ScriptItem[]
   selectedScript: ScriptItem
   showAndroidWarning: boolean
+  importError: string
   onCreate: () => void
   onImport: () => void
   onOpen: (id: string) => void
   onPrompt: (id: string) => void
 }
 
-function LibraryPanel({ scripts, selectedScript, showAndroidWarning, onCreate, onImport, onOpen, onPrompt }: LibraryPanelProps) {
+function LibraryPanel({ scripts, selectedScript, showAndroidWarning, importError, onCreate, onImport, onOpen, onPrompt }: LibraryPanelProps) {
   return (
     <div className="panel library-panel">
       <div className="panel-header">
@@ -302,6 +327,11 @@ function LibraryPanel({ scripts, selectedScript, showAndroidWarning, onCreate, o
       </div>
 
       {showAndroidWarning && <AndroidSpeechWarning />}
+      {importError && (
+        <p className="panel-alert" role="alert">
+          {importError}
+        </p>
+      )}
 
       <div className="script-grid">
         {scripts.map((script) => (
@@ -340,10 +370,11 @@ interface EditorPanelProps {
   onDuplicate: () => void
   onDelete: () => void
   onExport: () => void
+  onExportBackup: () => void
   onOpenLibrary: () => void
 }
 
-function EditorPanel({ script, settings, saveStatus, showAndroidWarning, onPatch, onPrompt, onDuplicate, onDelete, onExport, onOpenLibrary }: EditorPanelProps) {
+function EditorPanel({ script, settings, saveStatus, showAndroidWarning, onPatch, onPrompt, onDuplicate, onDelete, onExport, onExportBackup, onOpenLibrary }: EditorPanelProps) {
   const wordCount = useMemo(() => script.body.trim().split(/\s+/).filter(Boolean).length, [script.body])
 
   return (
@@ -357,6 +388,7 @@ function EditorPanel({ script, settings, saveStatus, showAndroidWarning, onPatch
           <IconButton icon={Library} label="Open library" onClick={onOpenLibrary} />
           <IconButton icon={Copy} label="Duplicate script" onClick={onDuplicate} />
           <IconButton icon={Download} label="Export text" onClick={onExport} />
+          <IconButton icon={Download} label="Export JSON backup" onClick={onExportBackup} />
           <IconButton icon={Trash2} label="Delete script" onClick={onDelete} variant="danger" />
         </div>
       </div>

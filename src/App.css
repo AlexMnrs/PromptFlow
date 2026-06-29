@@ -191,6 +191,18 @@
   font-size: 13px;
 }
 
+.rail-error,
+.panel-alert {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 95, 111, 0.5);
+  border-radius: 8px;
+  color: #ffd6dc;
+  background: rgba(255, 95, 111, 0.12);
+  font-size: 13px;
+  font-weight: 750;
+}
+
 .workspace {
   min-width: 0;
   min-height: 100svh;

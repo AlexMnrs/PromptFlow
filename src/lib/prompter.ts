@@ -264,7 +264,7 @@ export function formatDuration(seconds: number) {
   return `${minutes.toString().padStart(2, '0')}:${rest.toString().padStart(2, '0')}`
 }
 
-export function fileNameForScript(script: ScriptItem, extension: 'txt' | 'mp4' | 'webm') {
+export function fileNameForScript(script: ScriptItem, extension: 'txt' | 'json' | 'mp4' | 'webm') {
   const date = new Date().toISOString().slice(0, 10)
   const safeTitle =
     normalizeText(script.title)
