@@ -9,6 +9,7 @@ Add screenshots or recordings for UI changes. Write `N/A` if this does not chang
 ## Checklist
 
 - [ ] I ran `npm run lint`.
+- [ ] I ran `npm test`.
 - [ ] I ran `npm run build`.
 - [ ] I tested the affected flow manually when relevant.
 - [ ] I kept the change focused and documented any follow-up work.

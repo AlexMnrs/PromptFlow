@@ -49,6 +49,7 @@ Run checks before opening a pull request:
 
 ```bash
 npm run lint
+npm test
 npm run build
 ```
 
@@ -110,14 +111,14 @@ Later ideas:
 
 The project uses Vite with `base: './'`, so the generated `dist/` build works well on subpath deployments such as GitHub Pages.
 
-The CI workflow in `.github/workflows/ci.yml` runs `npm ci`, `npm run lint`, and `npm run build` on every push or pull request targeting `main`.
+The CI workflow in `.github/workflows/ci.yml` runs `npm ci`, `npm run lint`, `npm test`, and `npm run build` on every push or pull request targeting `main`.
 
 To publish the PWA with GitHub Pages, enable Pages with GitHub Actions or deploy the contents of `dist/` from the workflow you prefer.
 
 ## Public Repository Notes
 
 - `node_modules/`, `dist/`, `.tools/`, `.env*`, logs, and `*.tsbuildinfo` files are ignored.
-- There is no automated test suite beyond linting and production builds yet.
+- The pure prompter helper logic is covered by a small Vitest suite.
 - The project is released under the MIT License.
 - Security and privacy guidance is documented in [SECURITY.md](SECURITY.md).
 
@@ -133,6 +134,7 @@ Before proposing a change, please run:
 
 ```bash
 npm run lint
+npm test
 npm run build
 ```
 

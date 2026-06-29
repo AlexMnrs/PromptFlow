@@ -46,10 +46,11 @@ Run these commands before proposing a change:
 
 ```bash
 npm run lint
+npm test
 npm run build
 ```
 
-There is no automated test suite beyond linting and production builds yet. If your change affects browser APIs such as camera, microphone, recording, wake lock, sharing, or speech recognition, include the browsers and devices you tested manually.
+The pure prompter helper logic has focused unit tests. If your change affects browser APIs such as camera, microphone, recording, wake lock, sharing, or speech recognition, include the browsers and devices you tested manually.
 
 If your change affects privacy-sensitive behavior, also read [SECURITY.md](SECURITY.md) before opening a PR.
 
