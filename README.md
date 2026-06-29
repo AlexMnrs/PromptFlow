@@ -95,7 +95,6 @@ Near-term improvements:
 - Improve mobile layout testing across common viewport sizes.
 - Add a lightweight smoke test for the main script and recording workflow.
 - Expand browser compatibility notes with tested browser/device combinations.
-- Improve issue labels and contributor-friendly tasks.
 
 Later ideas:
 
@@ -122,6 +121,8 @@ To publish the PWA with GitHub Pages, enable Pages with GitHub Actions or deploy
 ## Contributing
 
 Small, focused improvements are welcome. Good first areas include documentation clarity, browser compatibility notes, mobile layout fixes, and lightweight tests around the main user workflow.
+
+Issues labeled `good first issue` or `help wanted` are good places to start.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, pull request guidelines, and browser testing notes.
 
