@@ -696,6 +696,65 @@ function PrompterPanel({ script, settings, showAndroidWarning, onSettingsChange,
     setShareError('File sharing is not available in this browser.')
   }, [recordedBlob, recordedMime, script])
 
+  const handleKeyboardShortcut = useCallback(
+    (event: KeyboardEvent) => {
+      if (isEditableShortcutTarget(event.target)) {
+        return
+      }
+
+      if (event.key === ' ' && !event.repeat) {
+        event.preventDefault()
+        setIsPlaying((current) => !current)
+        return
+      }
+
+      if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+        event.preventDefault()
+        setActiveLine((current) => clamp(current + 1, 0, lines.length - 1))
+        return
+      }
+
+      if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+        event.preventDefault()
+        setActiveLine((current) => clamp(current - 1, 0, lines.length - 1))
+        return
+      }
+
+      if (event.key === 'Home') {
+        event.preventDefault()
+        moveToLine(0)
+        return
+      }
+
+      if (event.key === 'Escape' && !event.repeat) {
+        event.preventDefault()
+
+        if (recordedUrl) {
+          dismissRecording()
+          return
+        }
+
+        if (showReadingPanel) {
+          setShowReadingPanel(false)
+          return
+        }
+
+        if (!showChrome) {
+          setShowChrome(true)
+          return
+        }
+
+        onBack()
+      }
+    },
+    [dismissRecording, lines.length, moveToLine, onBack, recordedUrl, showChrome, showReadingPanel],
+  )
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyboardShortcut)
+    return () => window.removeEventListener('keydown', handleKeyboardShortcut)
+  }, [handleKeyboardShortcut])
+
   return (
     <div
       className={`prompter-stage layout-${settings.layout} order-${settings.splitOrder} ${showChrome ? '' : 'chrome-hidden'}`}
@@ -996,6 +1055,14 @@ function previewText(body: string) {
 
 function isAndroidBrowser() {
   return typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent)
+}
+
+function isEditableShortcutTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  return Boolean(target.closest('input, textarea, select, [contenteditable="true"]'))
 }
 
 function nextTheme(theme: PrompterSettings['theme']): PrompterSettings['theme'] {
