@@ -75,16 +75,19 @@ npm run preview
 
 ## Browser Support
 
-Camera, microphone, recording, and speech recognition require a secure context. Use HTTPS in production. For local development, `localhost` works; for testing on a real iPhone, an HTTPS tunnel is usually the easiest path.
+PromptFlow works best in a modern mobile or desktop browser served from a secure context. Use HTTPS in production. For local development, `localhost` works; for testing on a real phone, an HTTPS tunnel is usually the easiest path.
 
-PromptFlow uses these browser APIs:
+PromptFlow uses progressive enhancement for browser APIs:
 
-- `getUserMedia` for camera and microphone access.
-- `MediaRecorder` for recording in the browser.
-- `SpeechRecognition` or `webkitSpeechRecognition` for voice-following.
-- Wake Lock and `navigator.share` as optional enhancements.
+| Feature | Browser API | Requirement | Fallback |
+| --- | --- | --- | --- |
+| Camera and microphone preview | `navigator.mediaDevices.getUserMedia` | HTTPS, `localhost`, or another secure context, plus user permission | The script library and manual prompter still work. If only one device is available, PromptFlow tries to continue with partial media access. |
+| In-browser recording | `MediaRecorder` | A supported browser and an active camera or microphone stream | Users can still rehearse and read scripts, but recording and download are unavailable. |
+| Voice-following | `SpeechRecognition` or `webkitSpeechRecognition` | Browser support, microphone permission, and a working speech recognition service | Users can move through the script with large manual controls. |
+| Keep screen awake | Screen Wake Lock | Browser support and permission from the platform | The app remains usable, but the device may dim or lock according to system settings. |
+| Native sharing | `navigator.share` | Browser and platform support, usually triggered from a user action | Users can download the recorded take instead. |
 
-If voice-following is not supported, the app still provides large manual controls to move through the script.
+Browser behavior can vary by device, operating system, and installed browser version. When reporting compatibility issues, include the browser, operating system, device, whether the app was served over HTTPS or `localhost`, and which feature was being tested.
 
 Recording captures the camera and microphone stream. The prompter text is used as an on-screen reading guide and is not burned into the exported video.
 
