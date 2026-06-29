@@ -8,11 +8,12 @@ interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'glass' | 'solid' | 'danger'
 }
 
-export function IconButton({ icon: Icon, label, active = false, variant = 'glass', className = '', ...props }: IconButtonProps) {
+export function IconButton({ icon: Icon, label, active, variant = 'glass', className = '', ...props }: IconButtonProps) {
   return (
     <button
       type="button"
       aria-label={label}
+      aria-pressed={active === undefined ? undefined : active}
       title={label}
       className={`icon-button icon-button--${variant} ${active ? 'is-active' : ''} ${className}`}
       {...props}

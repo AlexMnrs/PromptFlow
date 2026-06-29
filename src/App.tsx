@@ -209,7 +209,7 @@ function App() {
 
         <ScriptList scripts={appState.scripts} selectedId={selectedScript.id} onSelect={(id) => selectScript(id, 'editor')} />
 
-        <div className="rail-status">
+        <div className="rail-status" role="status" aria-live="polite">
           <Save aria-hidden="true" size={16} />
           <span>{saveStatus}</span>
         </div>
@@ -755,6 +755,9 @@ function PrompterPanel({ script, settings, showAndroidWarning, onSettingsChange,
     return () => window.removeEventListener('keydown', handleKeyboardShortcut)
   }, [handleKeyboardShortcut])
 
+  const recordingStatusText = countdown > 0 ? `Recording starts in ${countdown}` : isRecording ? `Recording active, ${formatDuration(elapsed)}` : recordedUrl ? 'Take ready for review' : 'Recording stopped'
+  const prompterStatusText = `${progress}% read. ${settings.voiceFollow ? voiceStatusText(speech.status) : 'Manual voice'}. ${hasMic ? 'Microphone active' : 'Microphone pending'}. Camera ${settings.cameraFacing === 'user' ? 'front' : 'rear'}. Screen ${wakeLockText(wakeLockStatus)}. ${recordingStatusText}.`
+
   return (
     <div
       className={`prompter-stage layout-${settings.layout} order-${settings.splitOrder} ${showChrome ? '' : 'chrome-hidden'}`}
@@ -769,14 +772,17 @@ function PrompterPanel({ script, settings, showAndroidWarning, onSettingsChange,
       }
     >
       <header className="prompter-topbar">
-        <IconButton icon={ArrowLeft} label="Volver al editor" onClick={onBack} />
-        <div className="session-title">
+        <IconButton icon={ArrowLeft} label="Back to editor" onClick={onBack} />
+        <div className="session-title" aria-live="polite">
           <strong>{script.title || 'Untitled'}</strong>
           <span>{isRecording ? `Recording ${formatDuration(elapsed)}` : `${progress}% read`}</span>
         </div>
         <IconButton icon={showReadingPanel ? SlidersHorizontal : Settings} label={showReadingPanel ? 'Hide settings' : 'Show settings'} active={showReadingPanel} onClick={() => setShowReadingPanel((current) => !current)} />
         <IconButton icon={EyeOff} label="Hide interface" onClick={() => setShowChrome(false)} />
-        <div className={`record-dot ${isRecording ? 'is-live' : ''}`} aria-label={isRecording ? 'Recording active' : 'Recording stopped'} />
+        <div className={`record-dot ${isRecording ? 'is-live' : ''}`} aria-hidden="true" />
+        <span className="visually-hidden" role="status" aria-live="polite">
+          {recordingStatusText}
+        </span>
       </header>
 
       {!showChrome && <IconButton className="prompter-chrome-toggle" icon={Eye} label="Show interface" onClick={() => setShowChrome(true)} variant="solid" />}
@@ -848,7 +854,7 @@ function PrompterPanel({ script, settings, showAndroidWarning, onSettingsChange,
       )}
 
       {showChrome && recordedUrl && (
-        <section className="take-review" aria-label="Take review">
+        <section className="take-review" aria-label="Take review" aria-live="polite">
           <IconButton className="take-close" icon={X} label="Close recorded take" onClick={dismissRecording} />
           <video src={recordedUrl} controls playsInline />
           <div>
@@ -917,7 +923,7 @@ function PrompterPanel({ script, settings, showAndroidWarning, onSettingsChange,
       )}
 
       {showChrome && (
-      <div className="status-strip">
+      <div className="status-strip" role="status" aria-live="polite" aria-label={prompterStatusText}>
         <span className={`status-pill status-${speech.status}`}>
           {settings.voiceFollow ? voiceStatusText(speech.status) : 'Manual voice'}
         </span>
@@ -927,8 +933,8 @@ function PrompterPanel({ script, settings, showAndroidWarning, onSettingsChange,
         <span className="status-pill">Zoom {zoomMode}</span>
         <span className="status-pill">Screen {wakeLockText(wakeLockStatus)}</span>
         <span className="status-pill">v{__APP_VERSION__}</span>
-        {recordingError && <span className="status-pill status-error">{recordingError}</span>}
-        {shareError && <span className="status-pill status-error">{shareError}</span>}
+        {recordingError && <span className="status-pill status-error" role="alert">{recordingError}</span>}
+        {shareError && <span className="status-pill status-error" role="alert">{shareError}</span>}
         {speech.error && <span className="status-pill">{speech.error}</span>}
         {recordedUrl && (
           <button className="status-pill status-button" type="button" onClick={downloadRecording}>
@@ -995,7 +1001,14 @@ function ScriptPane({ lines, activeLine, lineStep, matchedWordCount, onLineSelec
     <div className="script-pane" aria-label="Prompter text">
       <div className="script-track" style={{ transform: `translateY(calc(var(--active-offset) - ${activeLine * lineStep}px))` }}>
         {lines.map((line, index) => (
-          <button key={`${line}-${index}`} type="button" className={`script-line ${index === activeLine ? 'is-active' : ''}`} onClick={() => onLineSelect(index)}>
+          <button
+            key={`${line}-${index}`}
+            type="button"
+            className={`script-line ${index === activeLine ? 'is-active' : ''}`}
+            aria-current={index === activeLine ? 'true' : undefined}
+            aria-label={`Line ${index + 1}${index === activeLine ? ', current' : ''}: ${line}`}
+            onClick={() => onLineSelect(index)}
+          >
             {index === activeLine ? <HighlightedLine line={line} matchedIndexes={activeVoiceProgress.matchedIndexes} /> : line}
           </button>
         ))}

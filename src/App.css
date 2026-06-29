@@ -331,6 +331,17 @@
   border-color: var(--accent);
 }
 
+.primary-action:focus-visible,
+.secondary-action:focus-visible,
+.record-launch:focus-visible,
+.status-button:focus-visible,
+.icon-button:focus-visible,
+.script-row:focus-visible,
+.script-line:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
 .title-input {
   min-height: 54px;
   padding: 0 14px;
