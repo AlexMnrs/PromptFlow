@@ -174,10 +174,9 @@ export function getVoiceCursorForLine(lines: string[], lineIndex: number) {
 export function findVoiceCursorMatch(lines: string[], transcript: string, cursorWordIndex: number, options: VoiceCursorMatchOptions = {}): VoiceCursorMatch {
   const words = getVoiceWordPositions(lines)
   const currentProgress = getVoiceCursorProgress(lines, cursorWordIndex)
-  const spokenWords = toNormalizedWords(transcript).slice(-(options.spokenWordLimit ?? 5))
-  const spokenSet = new Set(spokenWords)
+  const spokenWords = toNormalizedWords(transcript).slice(-(options.spokenWordLimit ?? 8))
 
-  if (words.length === 0 || spokenSet.size === 0) {
+  if (words.length === 0 || spokenWords.length === 0) {
     return {
       cursorWordIndex,
       lineIndex: currentProgress.lineIndex,
@@ -187,34 +186,32 @@ export function findVoiceCursorMatch(lines: string[], transcript: string, cursor
     }
   }
 
-  let scriptIndex = clamp(cursorWordIndex, 0, words.length - 1)
-  let checkedWords = 0
-  const lookaheadWords = Math.max(1, options.lookaheadWords ?? 5)
+  const cursor = clamp(cursorWordIndex, 0, words.length)
 
-  while (scriptIndex < words.length && checkedWords < lookaheadWords) {
-    const scriptWord = words[scriptIndex]
-
-    if (spokenSet.has(scriptWord.clean)) {
-      if (scriptWord.clean === options.lastMatchedWord && checkedWords > 0) {
-        scriptIndex += 1
-        checkedWords += 1
-        continue
-      }
-
-      const nextCursor = scriptIndex + 1
-      const nextProgress = getVoiceCursorProgress(lines, nextCursor)
-
-      return {
-        cursorWordIndex: nextCursor,
-        lineIndex: nextProgress.lineIndex,
-        matched: true,
-        matchedWord: scriptWord.clean,
-        matchedWordCount: nextProgress.matchedWordCount,
-      }
+  if (cursor >= words.length) {
+    return {
+      cursorWordIndex,
+      lineIndex: currentProgress.lineIndex,
+      matched: false,
+      matchedWord: '',
+      matchedWordCount: currentProgress.matchedWordCount,
     }
+  }
 
-    scriptIndex += 1
-    checkedWords += 1
+  const lookaheadWords = Math.max(1, options.lookaheadWords ?? 8)
+  const phraseMatch = findConsecutiveVoicePhrase(words, spokenWords, cursor, lookaheadWords)
+  const nextCursor = phraseMatch?.nextCursor ?? findNearestVoiceWord(words, spokenWords, cursor, Math.min(lookaheadWords, 5), options.lastMatchedWord)
+
+  if (nextCursor !== null) {
+    const nextProgress = getVoiceCursorProgress(lines, nextCursor)
+
+    return {
+      cursorWordIndex: nextCursor,
+      lineIndex: nextProgress.lineIndex,
+      matched: true,
+      matchedWord: words[nextCursor - 1]?.clean ?? '',
+      matchedWordCount: nextProgress.matchedWordCount,
+    }
   }
 
   return {
@@ -224,6 +221,71 @@ export function findVoiceCursorMatch(lines: string[], transcript: string, cursor
     matchedWord: '',
     matchedWordCount: currentProgress.matchedWordCount,
   }
+}
+
+function findConsecutiveVoicePhrase(words: VoiceWordPosition[], spokenWords: string[], cursor: number, lookaheadWords: number) {
+  const searchEnd = Math.min(words.length - 1, cursor + lookaheadWords - 1)
+  let bestMatch: { nextCursor: number; score: number } | null = null
+
+  for (let scriptStart = cursor; scriptStart <= searchEnd; scriptStart += 1) {
+    for (let spokenStart = 0; spokenStart < spokenWords.length; spokenStart += 1) {
+      const matchedWordCount = countConsecutiveVoiceWords(words, scriptStart, spokenWords, spokenStart)
+
+      if (matchedWordCount < 2) {
+        continue
+      }
+
+      const nextCursor = scriptStart + matchedWordCount
+      const skippedScriptWords = scriptStart - cursor
+      const unusedSpokenTail = spokenWords.length - spokenStart - matchedWordCount
+      const score = matchedWordCount * 20 - skippedScriptWords * 3 - unusedSpokenTail
+
+      if (!bestMatch || score > bestMatch.score || (score === bestMatch.score && nextCursor > bestMatch.nextCursor)) {
+        bestMatch = { nextCursor, score }
+      }
+    }
+  }
+
+  return bestMatch
+}
+
+function countConsecutiveVoiceWords(words: VoiceWordPosition[], scriptStart: number, spokenWords: string[], spokenStart: number) {
+  let matchedWordCount = 0
+
+  while (
+    scriptStart + matchedWordCount < words.length &&
+    spokenStart + matchedWordCount < spokenWords.length &&
+    words[scriptStart + matchedWordCount].clean === spokenWords[spokenStart + matchedWordCount]
+  ) {
+    matchedWordCount += 1
+  }
+
+  return matchedWordCount
+}
+
+function findNearestVoiceWord(words: VoiceWordPosition[], spokenWords: string[], cursor: number, lookaheadWords: number, lastMatchedWord?: string) {
+  const spokenSet = new Set(spokenWords)
+  let scriptIndex = cursor
+  let checkedWords = 0
+
+  while (scriptIndex < words.length && checkedWords < lookaheadWords) {
+    const scriptWord = words[scriptIndex]
+
+    if (spokenSet.has(scriptWord.clean)) {
+      if (scriptWord.clean === lastMatchedWord && checkedWords > 0) {
+        scriptIndex += 1
+        checkedWords += 1
+        continue
+      }
+
+      return scriptIndex + 1
+    }
+
+    scriptIndex += 1
+    checkedWords += 1
+  }
+
+  return null
 }
 
 function toNormalizedWords(value: string) {

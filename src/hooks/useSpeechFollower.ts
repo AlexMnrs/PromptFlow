@@ -168,20 +168,21 @@ export function useSpeechFollower({
     }
 
     recognition.onresult = (event) => {
-      let spoken = ''
-      let finalSpoken = ''
+      const spokenParts: string[] = []
+      const finalSpokenParts: string[] = []
 
       for (let index = event.resultIndex; index < event.results.length; index += 1) {
         const result = event.results[index]
         const resultTranscript = result[0]?.transcript ?? ''
 
-        spoken += resultTranscript
+        spokenParts.push(resultTranscript)
 
         if (result.isFinal) {
-          finalSpoken += resultTranscript
+          finalSpokenParts.push(resultTranscript)
         }
       }
 
+      const spoken = spokenParts.join(' ')
       const cleanSpoken = spoken.trim()
 
       if (!cleanSpoken) {
@@ -194,6 +195,7 @@ export function useSpeechFollower({
         return
       }
 
+      const finalSpoken = finalSpokenParts.join(' ')
       const cleanFinalSpoken = finalSpoken.trim()
 
       if (cleanFinalSpoken) {
@@ -211,8 +213,8 @@ export function useSpeechFollower({
 
       const match = findVoiceCursorMatch(linesRef.current, cleanSpoken, voiceCursorRef.current, {
         lastMatchedWord: lastMatchedWordRef.current,
-        lookaheadWords: 5,
-        spokenWordLimit: 5,
+        lookaheadWords: 12,
+        spokenWordLimit: 12,
       })
       const cursorProgress = getVoiceCursorProgress(linesRef.current, match.cursorWordIndex)
 

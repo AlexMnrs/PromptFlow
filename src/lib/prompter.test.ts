@@ -63,7 +63,7 @@ describe('voice progress helpers', () => {
 
   it('advances to the nearest spoken word in a small lookahead window', () => {
     const lines = ['Today I want to record clearly']
-    const match = findVoiceCursorMatch(lines, 'want to record', 0)
+    const match = findVoiceCursorMatch(lines, 'want', 0)
 
     expect(match.matched).toBe(true)
     expect(match.cursorWordIndex).toBe(3)
@@ -78,6 +78,27 @@ describe('voice progress helpers', () => {
 
     expect(match.matched).toBe(true)
     expect(progress.lineIndex).toBe(1)
-    expect(progress.matchedWordCount).toBe(1)
+    expect(progress.matchedWordCount).toBe(2)
+  })
+
+  it('advances through a phrase when speech recognition returns several words at once', () => {
+    const lines = ['Today I want to record clearly']
+    const match = findVoiceCursorMatch(lines, 'Today I want to record', 0, { lookaheadWords: 8, spokenWordLimit: 8 })
+
+    expect(match.matched).toBe(true)
+    expect(match.cursorWordIndex).toBe(5)
+    expect(match.lineIndex).toBe(0)
+    expect(match.matchedWordCount).toBe(5)
+  })
+
+  it('continues from the current cursor when the next recognition result starts after finalized words', () => {
+    const lines = ['Today I want to record clearly']
+    const firstMatch = findVoiceCursorMatch(lines, 'Today I', 0, { lookaheadWords: 8, spokenWordLimit: 8 })
+    const nextMatch = findVoiceCursorMatch(lines, 'want to record clearly', firstMatch.cursorWordIndex, { lookaheadWords: 8, spokenWordLimit: 8 })
+
+    expect(firstMatch.cursorWordIndex).toBe(2)
+    expect(nextMatch.matched).toBe(true)
+    expect(nextMatch.cursorWordIndex).toBe(6)
+    expect(nextMatch.matchedWordCount).toBe(6)
   })
 })
