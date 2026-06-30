@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { findVoiceTargetLine, getLineVoiceProgress, normalizeText } from '../lib/prompter'
+import { findVoiceCursorMatch, getVoiceCursorForLine, getVoiceCursorProgress, normalizeText } from '../lib/prompter'
 
 type SpeechStatus = 'idle' | 'listening' | 'paused' | 'unsupported' | 'error'
 
@@ -41,13 +41,20 @@ export function useSpeechFollower({
   const networkErrorCountRef = useRef(0)
   const transcriptBufferRef = useRef('')
   const matchedWordCountRef = useRef(0)
+  const voiceCursorRef = useRef(getVoiceCursorForLine(lines, currentIndex))
+  const lastMatchedWordRef = useRef('')
 
   useEffect(() => {
     if (previousIndexRef.current !== currentIndex) {
-      transcriptBufferRef.current = ''
-      matchedWordCountRef.current = 0
-      setMatchingTranscript('')
-      setMatchedWordCount(0)
+      const cursorProgress = getVoiceCursorProgress(linesRef.current, voiceCursorRef.current)
+
+      if (cursorProgress.lineIndex !== currentIndex) {
+        voiceCursorRef.current = getVoiceCursorForLine(linesRef.current, currentIndex)
+        lastMatchedWordRef.current = ''
+        matchedWordCountRef.current = 0
+        setMatchedWordCount(0)
+      }
+
       previousIndexRef.current = currentIndex
     }
 
@@ -66,6 +73,8 @@ export function useSpeechFollower({
     linesRef.current = lines
     transcriptBufferRef.current = ''
     matchedWordCountRef.current = 0
+    voiceCursorRef.current = getVoiceCursorForLine(lines, currentIndexRef.current)
+    lastMatchedWordRef.current = ''
     setMatchedWordCount(0)
   }, [lines])
 
@@ -93,6 +102,8 @@ export function useSpeechFollower({
       }
       transcriptBufferRef.current = ''
       matchedWordCountRef.current = 0
+      voiceCursorRef.current = getVoiceCursorForLine(linesRef.current, currentIndexRef.current)
+      lastMatchedWordRef.current = ''
       setMatchingTranscript('')
       setMatchedWordCount(0)
       recognitionRef.current?.stop()
@@ -198,25 +209,24 @@ export function useSpeechFollower({
         }
       }
 
-      const matchingTranscript = `${transcriptBufferRef.current} ${cleanSpoken}`.trim()
-      const progress = getLineVoiceProgress(linesRef.current[currentIndexRef.current] ?? '', cleanSpoken, {
-        allowBacktrack: true,
-        cursorWordCount: matchedWordCountRef.current,
-        maxAdvanceWords: 1,
+      const match = findVoiceCursorMatch(linesRef.current, cleanSpoken, voiceCursorRef.current, {
+        lastMatchedWord: lastMatchedWordRef.current,
+        lookaheadWords: 5,
+        spokenWordLimit: 5,
       })
-      const targetLine = findVoiceTargetLine(linesRef.current, cleanSpoken, currentIndexRef.current, progress.matchedWordCount)
-      const targetProgress =
-        targetLine === currentIndexRef.current
-          ? progress
-          : getLineVoiceProgress(linesRef.current[targetLine] ?? '', cleanSpoken, {
-              cursorWordCount: 0,
-              maxAdvanceWords: 1,
-            })
+      const cursorProgress = getVoiceCursorProgress(linesRef.current, match.cursorWordIndex)
 
-      matchedWordCountRef.current = targetProgress.matchedWordCount
+      if (match.matched) {
+        voiceCursorRef.current = match.cursorWordIndex
+        lastMatchedWordRef.current = match.matchedWord
+      }
+
+      currentIndexRef.current = cursorProgress.lineIndex
+      matchedWordCountRef.current = cursorProgress.matchedWordCount
+      const matchingTranscript = `${transcriptBufferRef.current} ${cleanSpoken}`.trim()
       setMatchingTranscript(matchingTranscript)
       setMatchedWordCount(matchedWordCountRef.current)
-      onLineMatchedRef.current(targetLine)
+      onLineMatchedRef.current(cursorProgress.lineIndex)
     }
 
     try {

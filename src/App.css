@@ -697,6 +697,14 @@
   text-shadow: none;
 }
 
+.script-word.is-current {
+  color: #ffffff;
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 0.12em;
+  text-underline-offset: 0.18em;
+}
+
 .reading-panel {
   top: 96px;
   right: 14px;

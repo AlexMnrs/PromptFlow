@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { estimateMinutes, findVoiceTargetLine, getLineVoiceProgress, normalizeText, splitScript } from './prompter'
+import { estimateMinutes, findVoiceCursorMatch, findVoiceTargetLine, getLineVoiceProgress, getVoiceCursorProgress, normalizeText, splitScript } from './prompter'
 
 describe('splitScript', () => {
   it('splits scripts on punctuation and line breaks', () => {
@@ -59,5 +59,25 @@ describe('voice progress helpers', () => {
     const lines = ['First clear sentence', 'Second clear sentence']
 
     expect(findVoiceTargetLine(lines, 'clear', 0)).toBe(0)
+  })
+
+  it('advances to the nearest spoken word in a small lookahead window', () => {
+    const lines = ['Today I want to record clearly']
+    const match = findVoiceCursorMatch(lines, 'want to record', 0)
+
+    expect(match.matched).toBe(true)
+    expect(match.cursorWordIndex).toBe(3)
+    expect(match.lineIndex).toBe(0)
+    expect(match.matchedWordCount).toBe(3)
+  })
+
+  it('moves the cursor across visual lines while preserving local word progress', () => {
+    const lines = ['First clear sentence', 'Second clear sentence']
+    const match = findVoiceCursorMatch(lines, 'second clear', 3)
+    const progress = getVoiceCursorProgress(lines, match.cursorWordIndex)
+
+    expect(match.matched).toBe(true)
+    expect(progress.lineIndex).toBe(1)
+    expect(progress.matchedWordCount).toBe(1)
   })
 })

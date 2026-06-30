@@ -1024,13 +1024,25 @@ interface ScriptPaneProps {
 function ScriptPane({ lines, activeLine, matchedWordCount, onLineSelect }: ScriptPaneProps) {
   const trackRef = useRef<HTMLDivElement | null>(null)
   const lineRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const currentWordRef = useRef<HTMLSpanElement | null>(null)
   const [activeLineOffset, setActiveLineOffset] = useState(0)
   const activeVoiceProgress = useMemo(
     () => getLineVoiceProgress(lines[activeLine] ?? '', '', { fixedMatchedWordCount: matchedWordCount }),
     [activeLine, lines, matchedWordCount],
   )
   const measureActiveLine = useCallback(() => {
-    setActiveLineOffset(lineRefs.current[activeLine]?.offsetTop ?? 0)
+    const lineElement = lineRefs.current[activeLine]
+
+    if (!lineElement) {
+      setActiveLineOffset(0)
+      return
+    }
+
+    const wordElement = currentWordRef.current
+    const wordOffset =
+      wordElement && lineElement.contains(wordElement) ? Math.max(0, wordElement.getBoundingClientRect().top - lineElement.getBoundingClientRect().top) : 0
+
+    setActiveLineOffset(lineElement.offsetTop + wordOffset)
   }, [activeLine])
 
   useLayoutEffect(() => {
@@ -1073,7 +1085,18 @@ function ScriptPane({ lines, activeLine, matchedWordCount, onLineSelect }: Scrip
             aria-label={`Line ${index + 1}${index === activeLine ? ', current' : ''}: ${line}`}
             onClick={() => onLineSelect(index)}
           >
-            {index === activeLine ? <HighlightedLine line={line} matchedIndexes={activeVoiceProgress.matchedIndexes} /> : line}
+            {index === activeLine ? (
+              <HighlightedLine
+                line={line}
+                matchedIndexes={activeVoiceProgress.matchedIndexes}
+                currentWordIndex={matchedWordCount}
+                onCurrentWord={(element) => {
+                  currentWordRef.current = element
+                }}
+              />
+            ) : (
+              line
+            )}
           </button>
         ))}
       </div>
@@ -1084,9 +1107,11 @@ function ScriptPane({ lines, activeLine, matchedWordCount, onLineSelect }: Scrip
 interface HighlightedLineProps {
   line: string
   matchedIndexes: Set<number>
+  currentWordIndex: number
+  onCurrentWord: (element: HTMLSpanElement | null) => void
 }
 
-function HighlightedLine({ line, matchedIndexes }: HighlightedLineProps) {
+function HighlightedLine({ line, matchedIndexes, currentWordIndex, onCurrentWord }: HighlightedLineProps) {
   let wordIndex = 0
 
   return (
@@ -1096,11 +1121,16 @@ function HighlightedLine({ line, matchedIndexes }: HighlightedLineProps) {
           return part
         }
 
-        const currentWordIndex = wordIndex
+        const wordTokenIndex = wordIndex
+        const isCurrentWord = wordTokenIndex === currentWordIndex
         wordIndex += 1
 
         return (
-          <span key={`${part}-${index}`} className={`script-word ${matchedIndexes.has(currentWordIndex) ? 'is-spoken' : ''}`}>
+          <span
+            key={`${part}-${index}`}
+            ref={isCurrentWord ? onCurrentWord : undefined}
+            className={`script-word ${matchedIndexes.has(wordTokenIndex) ? 'is-spoken' : ''} ${isCurrentWord ? 'is-current' : ''}`}
+          >
             {part}
           </span>
         )

@@ -38,6 +38,26 @@ interface VoiceProgressOptions {
   minMatchedWordCount?: number
 }
 
+interface VoiceWordPosition {
+  lineIndex: number
+  wordIndex: number
+  clean: string
+}
+
+interface VoiceCursorMatchOptions {
+  lastMatchedWord?: string
+  lookaheadWords?: number
+  spokenWordLimit?: number
+}
+
+export interface VoiceCursorMatch {
+  cursorWordIndex: number
+  lineIndex: number
+  matched: boolean
+  matchedWord: string
+  matchedWordCount: number
+}
+
 export function findBestLineIndex(lines: string[], transcript: string, currentIndex: number, currentMatchedWordCount = 0) {
   const transcriptWords = toNormalizedWords(transcript).slice(-34)
 
@@ -107,8 +127,123 @@ export function extractWordTokens(line: string) {
   return line.match(/[\p{L}\p{N}]+/gu) ?? []
 }
 
+export function getVoiceCursorProgress(lines: string[], cursorWordIndex: number) {
+  const words = getVoiceWordPositions(lines)
+
+  if (words.length === 0) {
+    return {
+      lineIndex: 0,
+      matchedWordCount: 0,
+      wordCount: 0,
+    }
+  }
+
+  const cursor = clamp(cursorWordIndex, 0, words.length)
+
+  if (cursor >= words.length) {
+    const lineIndex = Math.max(0, lines.length - 1)
+
+    return {
+      lineIndex,
+      matchedWordCount: countLineWords(lines[lineIndex] ?? ''),
+      wordCount: countLineWords(lines[lineIndex] ?? ''),
+    }
+  }
+
+  const currentWord = words[cursor]
+
+  return {
+    lineIndex: currentWord.lineIndex,
+    matchedWordCount: currentWord.wordIndex,
+    wordCount: countLineWords(lines[currentWord.lineIndex] ?? ''),
+  }
+}
+
+export function getVoiceCursorForLine(lines: string[], lineIndex: number) {
+  const targetLine = clamp(lineIndex, 0, Math.max(0, lines.length - 1))
+  const words = getVoiceWordPositions(lines)
+  const firstWordIndex = words.findIndex((word) => word.lineIndex === targetLine)
+
+  if (firstWordIndex >= 0) {
+    return firstWordIndex
+  }
+
+  return words.length
+}
+
+export function findVoiceCursorMatch(lines: string[], transcript: string, cursorWordIndex: number, options: VoiceCursorMatchOptions = {}): VoiceCursorMatch {
+  const words = getVoiceWordPositions(lines)
+  const currentProgress = getVoiceCursorProgress(lines, cursorWordIndex)
+  const spokenWords = toNormalizedWords(transcript).slice(-(options.spokenWordLimit ?? 5))
+  const spokenSet = new Set(spokenWords)
+
+  if (words.length === 0 || spokenSet.size === 0) {
+    return {
+      cursorWordIndex,
+      lineIndex: currentProgress.lineIndex,
+      matched: false,
+      matchedWord: '',
+      matchedWordCount: currentProgress.matchedWordCount,
+    }
+  }
+
+  let scriptIndex = clamp(cursorWordIndex, 0, words.length - 1)
+  let checkedWords = 0
+  const lookaheadWords = Math.max(1, options.lookaheadWords ?? 5)
+
+  while (scriptIndex < words.length && checkedWords < lookaheadWords) {
+    const scriptWord = words[scriptIndex]
+
+    if (spokenSet.has(scriptWord.clean)) {
+      if (scriptWord.clean === options.lastMatchedWord && checkedWords > 0) {
+        scriptIndex += 1
+        checkedWords += 1
+        continue
+      }
+
+      const nextCursor = scriptIndex + 1
+      const nextProgress = getVoiceCursorProgress(lines, nextCursor)
+
+      return {
+        cursorWordIndex: nextCursor,
+        lineIndex: nextProgress.lineIndex,
+        matched: true,
+        matchedWord: scriptWord.clean,
+        matchedWordCount: nextProgress.matchedWordCount,
+      }
+    }
+
+    scriptIndex += 1
+    checkedWords += 1
+  }
+
+  return {
+    cursorWordIndex,
+    lineIndex: currentProgress.lineIndex,
+    matched: false,
+    matchedWord: '',
+    matchedWordCount: currentProgress.matchedWordCount,
+  }
+}
+
 function toNormalizedWords(value: string) {
   return extractWordTokens(normalizeText(value)).filter(Boolean)
+}
+
+function getVoiceWordPositions(lines: string[]) {
+  return lines.flatMap((line, lineIndex) =>
+    toNormalizedWords(line).map(
+      (clean, wordIndex): VoiceWordPosition => ({
+        lineIndex,
+        wordIndex,
+        clean,
+      }),
+    ),
+  )
+}
+
+function countLineWords(line: string) {
+  return toNormalizedWords(line).length
 }
 
 function getMatchedWordCount(lineWords: string[], transcriptWords: string[], options: VoiceProgressOptions) {
