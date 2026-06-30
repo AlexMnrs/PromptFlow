@@ -963,7 +963,9 @@ function PrompterPanel({ script, settings, showAndroidWarning, onSettingsChange,
         {countdown > 0 && <span className="status-pill status-countdown">Recording in {countdown}</span>}
         <span className="status-pill">Zoom {zoomMode}</span>
         <span className="status-pill">Screen {wakeLockText(wakeLockStatus)}</span>
-        <span className="status-pill">v{__APP_VERSION__}</span>
+        <span className="status-pill" title={__APP_BUILD_INFO__} aria-label={`Version ${__APP_VERSION__}. ${__APP_BUILD_INFO__}`}>
+          v{__APP_VERSION__}
+        </span>
         {recordingError && <span className="status-pill status-error" role="alert">{recordingError}</span>}
         {shareError && <span className="status-pill status-error" role="alert">{shareError}</span>}
         {speech.error && <span className="status-pill">{speech.error}</span>}
