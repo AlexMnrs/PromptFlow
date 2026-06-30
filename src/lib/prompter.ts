@@ -47,6 +47,7 @@ interface VoiceWordPosition {
 interface VoiceCursorMatchOptions {
   lastMatchedWord?: string
   lookaheadWords?: number
+  maxAdvanceWords?: number
   spokenWordLimit?: number
 }
 
@@ -199,8 +200,10 @@ export function findVoiceCursorMatch(lines: string[], transcript: string, cursor
   }
 
   const lookaheadWords = Math.max(1, options.lookaheadWords ?? 8)
-  const phraseMatch = findConsecutiveVoicePhrase(words, spokenWords, cursor, lookaheadWords)
-  const nextCursor = phraseMatch?.nextCursor ?? findNearestVoiceWord(words, spokenWords, cursor, Math.min(lookaheadWords, 5), options.lastMatchedWord)
+  const maxAdvanceWords = Math.max(1, options.maxAdvanceWords ?? 4)
+  const repeatedBoundaryTranscript = isLikelyRepeatedLineBoundaryTranscript(words, spokenWords, cursor)
+  const phraseMatch = repeatedBoundaryTranscript ? null : findConsecutiveVoicePhrase(words, spokenWords, cursor, lookaheadWords, maxAdvanceWords)
+  const nextCursor = phraseMatch?.nextCursor ?? (repeatedBoundaryTranscript ? null : findNearestVoiceWord(words, spokenWords.slice(-4), cursor, Math.min(lookaheadWords, 4), options.lastMatchedWord))
 
   if (nextCursor !== null) {
     const nextProgress = getVoiceCursorProgress(lines, nextCursor)
@@ -223,15 +226,27 @@ export function findVoiceCursorMatch(lines: string[], transcript: string, cursor
   }
 }
 
-function findConsecutiveVoicePhrase(words: VoiceWordPosition[], spokenWords: string[], cursor: number, lookaheadWords: number) {
+function findConsecutiveVoicePhrase(words: VoiceWordPosition[], spokenWords: string[], cursor: number, lookaheadWords: number, maxAdvanceWords: number) {
   const searchEnd = Math.min(words.length - 1, cursor + lookaheadWords - 1)
   let bestMatch: { nextCursor: number; score: number } | null = null
 
   for (let scriptStart = cursor; scriptStart <= searchEnd; scriptStart += 1) {
     for (let spokenStart = 0; spokenStart < spokenWords.length; spokenStart += 1) {
-      const matchedWordCount = countConsecutiveVoiceWords(words, scriptStart, spokenWords, spokenStart)
+      const matchedWordCount = Math.min(countConsecutiveVoiceWords(words, scriptStart, spokenWords, spokenStart), maxAdvanceWords)
 
       if (matchedWordCount < 2) {
+        continue
+      }
+
+      if (!hasStrongVoiceWord(spokenWords.slice(spokenStart, spokenStart + matchedWordCount))) {
+        continue
+      }
+
+      if (scriptStart !== cursor && spokenStart + matchedWordCount < spokenWords.length) {
+        continue
+      }
+
+      if (isLikelyRepeatedLineBoundaryPhrase(words, scriptStart, matchedWordCount)) {
         continue
       }
 
@@ -247,6 +262,42 @@ function findConsecutiveVoicePhrase(words: VoiceWordPosition[], spokenWords: str
   }
 
   return bestMatch
+}
+
+function isLikelyRepeatedLineBoundaryTranscript(words: VoiceWordPosition[], spokenWords: string[], cursor: number) {
+  const firstWord = words[cursor]
+
+  if (!firstWord || firstWord.wordIndex !== 0 || spokenWords.length < 2 || cursor - spokenWords.length < 0) {
+    return false
+  }
+
+  for (let index = 0; index < spokenWords.length; index += 1) {
+    if (words[cursor + index]?.clean !== spokenWords[index] || words[cursor - spokenWords.length + index]?.clean !== spokenWords[index]) {
+      return false
+    }
+  }
+
+  return true
+}
+
+function hasStrongVoiceWord(words: string[]) {
+  return words.some((word) => word.length >= 4)
+}
+
+function isLikelyRepeatedLineBoundaryPhrase(words: VoiceWordPosition[], scriptStart: number, matchedWordCount: number) {
+  const firstWord = words[scriptStart]
+
+  if (!firstWord || firstWord.wordIndex !== 0 || scriptStart - matchedWordCount < 0) {
+    return false
+  }
+
+  for (let index = 0; index < matchedWordCount; index += 1) {
+    if (words[scriptStart + index]?.clean !== words[scriptStart - matchedWordCount + index]?.clean) {
+      return false
+    }
+  }
+
+  return true
 }
 
 function countConsecutiveVoiceWords(words: VoiceWordPosition[], scriptStart: number, spokenWords: string[], spokenStart: number) {
@@ -270,6 +321,12 @@ function findNearestVoiceWord(words: VoiceWordPosition[], spokenWords: string[],
 
   while (scriptIndex < words.length && checkedWords < lookaheadWords) {
     const scriptWord = words[scriptIndex]
+
+    if (scriptWord.clean.length <= 2) {
+      scriptIndex += 1
+      checkedWords += 1
+      continue
+    }
 
     if (spokenSet.has(scriptWord.clean)) {
       if (scriptWord.clean === lastMatchedWord && checkedWords > 0) {

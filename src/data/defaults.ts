@@ -1,14 +1,14 @@
 import type { AppState, PrompterSettings, ScriptItem } from '../types'
 
-const sampleBody = `Hi. Today I want to record a clear, direct take without losing the thread.
+const sampleBody = `Hola. Hoy quiero grabar una toma clara y directa sin perder el hilo.
 
-The main idea appears at the beginning, because the audience decides quickly whether to keep watching.
+La idea principal aparece al principio, porque la audiencia decide rapido si quiere seguir mirando.
 
-When the text follows my voice, I can look more at the camera and less at the screen.
+Cuando el texto sigue mi voz, puedo mirar mas a la camara y menos a la pantalla.
 
-If I need to improvise, I pause for a moment, return to the active line, and continue without breaking the take.
+Si necesito improvisar, hago una pausa, vuelvo a la frase activa y continuo sin romper la toma.
 
-At the end, I close with a short sentence, a clear action, and a natural pause.`
+Al final, cierro con una frase corta, una accion clara y una pausa natural.`
 
 export const defaultSettings: PrompterSettings = {
   layout: 'overlay',
@@ -20,7 +20,7 @@ export const defaultSettings: PrompterSettings = {
   textWidth: 82,
   speed: 1,
   theme: 'dark',
-  language: 'en-US',
+  language: 'es-ES',
   overlayOpacity: 0.44,
   voiceFollow: true,
   voiceCommands: true,
@@ -45,7 +45,7 @@ export function createScript(title = 'New script', body = ''): ScriptItem {
 }
 
 export function createDefaultState(): AppState {
-  const seedScript = createScript('Welcome script', sampleBody)
+  const seedScript = createScript('Guion de bienvenida', sampleBody)
 
   return {
     scripts: [seedScript],

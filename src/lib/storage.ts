@@ -4,6 +4,8 @@ import type { AppState, CameraFacing, PrompterLayout, PrompterSettings, ScriptIt
 const storageKey = 'promptflow.app-state.v1'
 const legacySpanishSeedTitle = 'Guion de bienvenida'
 const legacySpanishSeedStart = 'Hola. Hoy quiero grabar una pieza clara'
+const legacyEnglishSeedTitle = 'Welcome script'
+const legacyEnglishSeedStart = 'Hi. Today I want to record'
 
 export function loadState(): AppState {
   try {
@@ -103,8 +105,8 @@ function migrateState(state: AppState): AppState {
   const defaultScript = defaultState.scripts[0]
   const hasOnlyLegacySeed =
     state.scripts.length === 1 &&
-    state.scripts[0]?.title === legacySpanishSeedTitle &&
-    state.scripts[0]?.body.startsWith(legacySpanishSeedStart)
+    ((state.scripts[0]?.title === legacySpanishSeedTitle && state.scripts[0]?.body.startsWith(legacySpanishSeedStart)) ||
+      (state.scripts[0]?.title === legacyEnglishSeedTitle && state.scripts[0]?.body.startsWith(legacyEnglishSeedStart)))
 
   if (!hasOnlyLegacySeed) {
     return state

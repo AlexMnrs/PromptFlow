@@ -21,7 +21,7 @@ describe('loadState', () => {
     const state = loadState()
 
     expect(state.scripts).toHaveLength(1)
-    expect(state.scripts[0].title).toBe('Welcome script')
+    expect(state.scripts[0].title).toBe('Guion de bienvenida')
     expect(state.settings).toEqual(defaultSettings)
   })
 
@@ -85,7 +85,7 @@ describe('loadState', () => {
     expect(state.settings.overlayOpacity).toBe(defaultSettings.overlayOpacity)
   })
 
-  it('migrates the old Spanish seed while preserving the script id', () => {
+  it('migrates old seed scripts to the current Spanish default while preserving the script id', () => {
     localStorage.setItem(
       storageKey,
       JSON.stringify({
@@ -104,9 +104,33 @@ describe('loadState', () => {
     const state = loadState()
 
     expect(state.scripts[0].id).toBe('legacy')
-    expect(state.scripts[0].title).toBe('Welcome script')
-    expect(state.scripts[0].body).toContain('Today I want to record')
+    expect(state.scripts[0].title).toBe('Guion de bienvenida')
+    expect(state.scripts[0].body).toContain('Hoy quiero grabar')
     expect(state.settings.language).toBe(defaultSettings.language)
+  })
+
+  it('migrates the old English default seed to Spanish defaults', () => {
+    localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        scripts: [
+          scriptFixture({
+            id: 'legacy-english',
+            title: 'Welcome script',
+            body: 'Hi. Today I want to record a clear, direct take without losing the thread.',
+          }),
+        ],
+        selectedScriptId: 'legacy-english',
+        settings: { ...defaultSettings, language: 'en-US' },
+      }),
+    )
+
+    const state = loadState()
+
+    expect(state.scripts[0].id).toBe('legacy-english')
+    expect(state.scripts[0].title).toBe('Guion de bienvenida')
+    expect(state.scripts[0].body).toContain('Hoy quiero grabar')
+    expect(state.settings.language).toBe('es-ES')
   })
 
   it('round-trips valid saved state', () => {
