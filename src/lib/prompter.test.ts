@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { estimateMinutes, findVoiceCursorMatch, findVoiceTargetLine, getLineVoiceProgress, getVoiceCursorProgress, normalizeText, splitScript } from './prompter'
+import { estimateMinutes, findVoiceCursorMatch, findVoiceTargetLine, getLineVoiceProgress, getVoiceCursorForLine, getVoiceCursorProgress, normalizeText, splitScript } from './prompter'
 
 describe('splitScript', () => {
   it('splits scripts on punctuation and line breaks', () => {
@@ -78,56 +78,67 @@ describe('voice progress helpers', () => {
 
     expect(match.matched).toBe(true)
     expect(progress.lineIndex).toBe(1)
-    expect(progress.matchedWordCount).toBe(2)
+    expect(progress.matchedWordCount).toBe(1)
   })
 
-  it('advances through a phrase when speech recognition returns several words at once', () => {
+  it('follows VoicePrompter by advancing to the nearest matching word only', () => {
     const lines = ['Today I want to record clearly']
-    const match = findVoiceCursorMatch(lines, 'Today I want to record', 0, { lookaheadWords: 8, maxAdvanceWords: 6, spokenWordLimit: 8 })
+    const match = findVoiceCursorMatch(lines, 'Today I want to record', 0, { lookaheadWords: 5, spokenWordLimit: 5 })
 
     expect(match.matched).toBe(true)
-    expect(match.cursorWordIndex).toBe(5)
+    expect(match.cursorWordIndex).toBe(1)
     expect(match.lineIndex).toBe(0)
-    expect(match.matchedWordCount).toBe(5)
+    expect(match.matchedWordCount).toBe(1)
   })
 
-  it('continues from the current cursor when the next recognition result starts after finalized words', () => {
+  it('can progress through repeated speech results without jumping ahead', () => {
     const lines = ['Today I want to record clearly']
-    const firstMatch = findVoiceCursorMatch(lines, 'Today I', 0, { lookaheadWords: 8, maxAdvanceWords: 6, spokenWordLimit: 8 })
-    const nextMatch = findVoiceCursorMatch(lines, 'want to record clearly', firstMatch.cursorWordIndex, { lookaheadWords: 8, maxAdvanceWords: 6, spokenWordLimit: 8 })
+    let cursor = 0
+    let lastMatchedWord = ''
 
-    expect(firstMatch.cursorWordIndex).toBe(2)
-    expect(nextMatch.matched).toBe(true)
-    expect(nextMatch.cursorWordIndex).toBe(6)
-    expect(nextMatch.matchedWordCount).toBe(6)
+    for (let step = 0; step < 5; step += 1) {
+      const match = findVoiceCursorMatch(lines, 'Today I want to record', cursor, { lastMatchedWord, lookaheadWords: 5, spokenWordLimit: 5 })
+      expect(match.matched).toBe(true)
+      cursor = match.cursorWordIndex
+      lastMatchedWord = match.matchedWord
+    }
+
+    expect(cursor).toBe(5)
+    expect(getVoiceCursorProgress(lines, cursor).matchedWordCount).toBe(5)
   })
 
-  it('limits phrase advancement so mobile speech chunks do not jump too far ahead', () => {
+  it('does not jump paragraphs when spoken words are outside the small lookahead window', () => {
     const lines = ['Today I want to record clearly']
-    const match = findVoiceCursorMatch(lines, 'Today I want to record clearly', 0, { lookaheadWords: 8, maxAdvanceWords: 3, spokenWordLimit: 8 })
-
-    expect(match.matched).toBe(true)
-    expect(match.cursorWordIndex).toBe(3)
-    expect(match.matchedWordCount).toBe(3)
-  })
-
-  it('does not reuse the previous line tail as the beginning of the next line', () => {
-    const lines = ['Hoy digo la siguiente parte', 'La siguiente parte empieza ahora']
-    const staleMatch = findVoiceCursorMatch(lines, 'la siguiente parte', 5, { lookaheadWords: 8, maxAdvanceWords: 4, spokenWordLimit: 8 })
-    const freshMatch = findVoiceCursorMatch(lines, 'la siguiente parte empieza', 5, { lookaheadWords: 8, maxAdvanceWords: 4, spokenWordLimit: 8 })
-
-    expect(staleMatch.matched).toBe(false)
-    expect(staleMatch.cursorWordIndex).toBe(5)
-    expect(freshMatch.matched).toBe(true)
-    expect(freshMatch.lineIndex).toBe(1)
-    expect(freshMatch.matchedWordCount).toBe(4)
-  })
-
-  it('does not jump paragraphs from a short filler word alone', () => {
-    const lines = ['Uno dos tres', 'La cuarta frase']
-    const match = findVoiceCursorMatch(lines, 'la', 3, { lookaheadWords: 8, spokenWordLimit: 8 })
+    const match = findVoiceCursorMatch(lines, 'clearly', 0, { lookaheadWords: 5, spokenWordLimit: 5 })
 
     expect(match.matched).toBe(false)
-    expect(match.cursorWordIndex).toBe(3)
+    expect(match.cursorWordIndex).toBe(0)
+  })
+
+  it('does not jump into the next sentence before the current sentence is complete', () => {
+    const lines = ['Hoy termino esta frase', 'Siguiente parrafo empieza aqui']
+    const match = findVoiceCursorMatch(lines, 'siguiente parrafo', 2, { lookaheadWords: 5, spokenWordLimit: 5 })
+
+    expect(match.matched).toBe(false)
+    expect(match.cursorWordIndex).toBe(2)
+    expect(match.lineIndex).toBe(0)
+  })
+
+  it('can enter the next sentence once the cursor is already there', () => {
+    const lines = ['Hoy termino esta frase', 'Siguiente parrafo empieza aqui']
+    const nextLineCursor = getVoiceCursorForLine(lines, 1)
+    const match = findVoiceCursorMatch(lines, 'siguiente parrafo', nextLineCursor, { lookaheadWords: 5, spokenWordLimit: 5 })
+
+    expect(match.matched).toBe(true)
+    expect(match.cursorWordIndex).toBe(nextLineCursor + 1)
+    expect(match.lineIndex).toBe(1)
+  })
+
+  it('does not reuse unrelated previous line words to skip to a different paragraph', () => {
+    const lines = ['Hoy digo la siguiente parte', 'Ahora empieza otra idea']
+    const match = findVoiceCursorMatch(lines, 'la siguiente parte', 5, { lookaheadWords: 5, spokenWordLimit: 5 })
+
+    expect(match.matched).toBe(false)
+    expect(match.cursorWordIndex).toBe(5)
   })
 })

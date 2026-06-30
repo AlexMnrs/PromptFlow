@@ -2,6 +2,7 @@ import { createDefaultState, defaultSettings } from '../data/defaults'
 import type { AppState, CameraFacing, PrompterLayout, PrompterSettings, ScriptItem, SplitOrder, ThemeMode } from '../types'
 
 const storageKey = 'promptflow.app-state.v1'
+const languageDefaultMigrationKey = 'promptflow.language-default-es.v1'
 const legacySpanishSeedTitle = 'Guion de bienvenida'
 const legacySpanishSeedStart = 'Hola. Hoy quiero grabar una pieza clara'
 const legacyEnglishSeedTitle = 'Welcome script'
@@ -12,10 +13,11 @@ export function loadState(): AppState {
     const stored = localStorage.getItem(storageKey)
 
     if (!stored) {
+      markDefaultLanguageMigrated()
       return createDefaultState()
     }
 
-    return migrateState(normalizeState(JSON.parse(stored)))
+    return migrateDefaultLanguage(migrateState(normalizeState(JSON.parse(stored))))
   } catch {
     return createDefaultState()
   }
@@ -126,6 +128,43 @@ function migrateState(state: AppState): AppState {
       ...state.settings,
       language: defaultSettings.language,
     },
+  }
+}
+
+function migrateDefaultLanguage(state: AppState): AppState {
+  if (state.settings.language !== 'en-US') {
+    markDefaultLanguageMigrated()
+    return state
+  }
+
+  if (hasDefaultLanguageMigrated()) {
+    return state
+  }
+
+  markDefaultLanguageMigrated()
+
+  return {
+    ...state,
+    settings: {
+      ...state.settings,
+      language: defaultSettings.language,
+    },
+  }
+}
+
+function hasDefaultLanguageMigrated() {
+  try {
+    return localStorage.getItem(languageDefaultMigrationKey) === 'done'
+  } catch {
+    return true
+  }
+}
+
+function markDefaultLanguageMigrated() {
+  try {
+    localStorage.setItem(languageDefaultMigrationKey, 'done')
+  } catch {
+    // Ignore storage errors; saving the app state already has its own fallback.
   }
 }
 

@@ -4,6 +4,7 @@ import type { AppState, ScriptItem } from '../types'
 import { loadState, saveState } from './storage'
 
 const storageKey = 'promptflow.app-state.v1'
+const languageDefaultMigrationKey = 'promptflow.language-default-es.v1'
 
 beforeEach(() => {
   const store = new Map<string, string>()
@@ -131,6 +132,39 @@ describe('loadState', () => {
     expect(state.scripts[0].title).toBe('Guion de bienvenida')
     expect(state.scripts[0].body).toContain('Hoy quiero grabar')
     expect(state.settings.language).toBe('es-ES')
+  })
+
+  it('migrates a saved English default language to Spanish once', () => {
+    localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        scripts: [scriptFixture({ id: 'custom', title: 'Custom', body: 'Texto propio' })],
+        selectedScriptId: 'custom',
+        settings: { ...defaultSettings, language: 'en-US' },
+      }),
+    )
+
+    const state = loadState()
+
+    expect(state.scripts[0].title).toBe('Custom')
+    expect(state.settings.language).toBe('es-ES')
+    expect(localStorage.getItem(languageDefaultMigrationKey)).toBe('done')
+  })
+
+  it('preserves English after the default language migration has already run', () => {
+    localStorage.setItem(languageDefaultMigrationKey, 'done')
+    localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        scripts: [scriptFixture({ id: 'custom', title: 'Custom', body: 'Texto propio' })],
+        selectedScriptId: 'custom',
+        settings: { ...defaultSettings, language: 'en-US' },
+      }),
+    )
+
+    const state = loadState()
+
+    expect(state.settings.language).toBe('en-US')
   })
 
   it('round-trips valid saved state', () => {

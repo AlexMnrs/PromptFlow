@@ -24,7 +24,6 @@ import {
   Play,
   Plus,
   RefreshCcw,
-  RotateCcw,
   Save,
   Settings,
   Share2,
@@ -471,10 +470,29 @@ function PrompterPanel({ script, settings, showAndroidWarning, onSettingsChange,
   const [shareError, setShareError] = useState('')
   const [keepAwake, setKeepAwake] = useState(true)
   const [showChrome, setShowChrome] = useState(true)
-  const [showReadingPanel, setShowReadingPanel] = useState(true)
+  const [showReadingPanel, setShowReadingPanel] = useState(false)
   const [zoomMode, setZoomMode] = useState<'hardware' | 'preview'>('preview')
   const wakeLockStatus = useWakeLock(keepAwake && (isPlaying || isRecording || countdown > 0))
   const progress = Math.round(((activeLine + 1) / lines.length) * 100)
+
+  useEffect(() => {
+    const html = document.documentElement
+    const body = document.body
+    const previousHtmlOverflow = html.style.overflow
+    const previousBodyOverflow = body.style.overflow
+    const previousOverscroll = body.style.overscrollBehavior
+
+    html.style.overflow = 'hidden'
+    body.style.overflow = 'hidden'
+    body.style.overscrollBehavior = 'none'
+    window.scrollTo(0, 0)
+
+    return () => {
+      html.style.overflow = previousHtmlOverflow
+      body.style.overflow = previousBodyOverflow
+      body.style.overscrollBehavior = previousOverscroll
+    }
+  }, [])
 
   const moveToLine = useCallback(
     (index: number) => {
@@ -809,7 +827,6 @@ function PrompterPanel({ script, settings, showAndroidWarning, onSettingsChange,
           <strong>{script.title || 'Untitled'}</strong>
           <span>{isRecording ? `Recording ${formatDuration(elapsed)}` : `${progress}% read`}</span>
         </div>
-        <IconButton icon={showReadingPanel ? SlidersHorizontal : Settings} label={showReadingPanel ? 'Hide settings' : 'Show settings'} active={showReadingPanel} onClick={() => setShowReadingPanel((current) => !current)} />
         <IconButton icon={EyeOff} label="Hide interface" onClick={() => setShowChrome(false)} />
         <div className={`record-dot ${isRecording ? 'is-live' : ''}`} aria-hidden="true" />
         <span className="visually-hidden" role="status" aria-live="polite">
@@ -841,39 +858,19 @@ function PrompterPanel({ script, settings, showAndroidWarning, onSettingsChange,
       </section>
 
       {showChrome && showReadingPanel && (
-        <aside className="reading-panel" aria-label="Reading settings">
-          <div className="reading-panel-header">
-            <span>Settings</span>
-            <IconButton icon={X} label="Close settings" onClick={() => setShowReadingPanel(false)} />
-          </div>
-          <label>
-            <Type aria-hidden="true" size={16} />
-            Text
-            <input type="range" min="22" max="58" value={settings.fontSize} onChange={(event) => onSettingsChange({ fontSize: Number(event.target.value) })} />
-          </label>
-          <label>
-            <SlidersHorizontal aria-hidden="true" size={16} />
-            Speed
-            <input type="range" min="0.5" max="2.5" step="0.1" value={settings.speed} onChange={(event) => onSettingsChange({ speed: Number(event.target.value) })} />
-          </label>
-          <label>
-            <ZoomIn aria-hidden="true" size={16} />
-            Zoom {settings.zoom.toFixed(1)}x
-            <input type="range" min="1" max="3" step="0.1" value={settings.zoom} onChange={(event) => onSettingsChange({ zoom: Number(event.target.value) })} />
-          </label>
-          <label>
-            <Languages aria-hidden="true" size={16} />
-            Language
-            <select value={settings.language} onChange={(event) => onSettingsChange({ language: event.target.value })}>
-              <option value="es-ES">Spanish</option>
-              <option value="en-US">English</option>
-              <option value="fr-FR">Francais</option>
-              <option value="de-DE">Deutsch</option>
-              <option value="it-IT">Italiano</option>
-              <option value="pt-PT">Portuguese</option>
-            </select>
-          </label>
-        </aside>
+        <ReadingSettingsSheet
+          settings={settings}
+          zoomMode={zoomMode}
+          hasCamera={hasCamera}
+          isRecording={isRecording}
+          countdown={countdown}
+          keepAwake={keepAwake}
+          onClose={() => setShowReadingPanel(false)}
+          onRequestMedia={requestMedia}
+          onSettingsChange={onSettingsChange}
+          onStopMedia={stopMedia}
+          onToggleKeepAwake={() => setKeepAwake((current) => !current)}
+        />
       )}
 
       {showChrome && showAndroidWarning && settings.voiceFollow && <AndroidSpeechWarning className="prompter-warning" compact />}
@@ -909,37 +906,6 @@ function PrompterPanel({ script, settings, showAndroidWarning, onSettingsChange,
       {showChrome && (
       <footer className="prompter-dock">
         <IconButton icon={isPlaying ? Pause : Play} label={isPlaying ? 'Pause reading' : 'Start reading'} active={isPlaying} onClick={() => setIsPlaying((current) => !current)} variant="solid" />
-        <IconButton icon={RotateCcw} label="Restart script" onClick={() => moveToLine(0)} />
-        <IconButton icon={Minus} label="Previous line" onClick={() => moveToLine(activeLine - 1)} />
-        <IconButton icon={Plus} label="Next line" onClick={() => moveToLine(activeLine + 1)} />
-        <IconButton icon={showReadingPanel ? SlidersHorizontal : Settings} label={showReadingPanel ? 'Hide settings' : 'Show settings'} active={showReadingPanel} onClick={() => setShowReadingPanel((current) => !current)} />
-        <IconButton icon={settings.voiceFollow ? Mic : MicOff} label="Toggle voice-following" active={settings.voiceFollow} onClick={() => onSettingsChange({ voiceFollow: !settings.voiceFollow })} />
-        <IconButton
-          icon={settings.layout === 'overlay' ? Wand2 : ArrowLeftRight}
-          label="Switch overlay and split"
-          active={settings.layout === 'split'}
-          onClick={() => onSettingsChange({ layout: settings.layout === 'overlay' ? 'split' : 'overlay' })}
-        />
-        <IconButton
-          icon={ArrowLeftRight}
-          label="Swap split side"
-          onClick={() => onSettingsChange({ splitOrder: settings.splitOrder === 'script-first' ? 'camera-first' : 'script-first' })}
-        />
-        <IconButton
-          icon={hasCamera ? CameraOff : Camera}
-          label={hasCamera ? 'Stop camera' : 'Enable camera'}
-          active={hasCamera}
-          disabled={isRecording || countdown > 0}
-          onClick={hasCamera ? stopMedia : () => void requestMedia()}
-        />
-        <IconButton
-          icon={SwitchCamera}
-          label="Switch front or rear camera"
-          active={settings.cameraFacing === 'environment'}
-          disabled={isRecording || countdown > 0}
-          onClick={() => onSettingsChange({ cameraFacing: settings.cameraFacing === 'user' ? 'environment' : 'user' })}
-        />
-        <IconButton icon={RefreshCcw} label="Toggle mirror" active={settings.mirror} onClick={() => onSettingsChange({ mirror: !settings.mirror })} />
         <IconButton
           icon={isRecording || countdown > 0 ? Square : CircleDot}
           label={isRecording ? 'Stop recording' : countdown > 0 ? 'Cancel countdown' : 'Record'}
@@ -947,22 +913,20 @@ function PrompterPanel({ script, settings, showAndroidWarning, onSettingsChange,
           variant={isRecording || countdown > 0 ? 'danger' : 'glass'}
           onClick={isRecording ? stopRecording : startRecording}
         />
-        <IconButton icon={MonitorUp} label="Keep screen awake" active={keepAwake} onClick={() => setKeepAwake((current) => !current)} />
-        <IconButton icon={settings.theme === 'light' ? Moon : settings.theme === 'dark' ? Sun : Settings} label="Change theme" onClick={() => onSettingsChange({ theme: nextTheme(settings.theme) })} />
-        <IconButton icon={EyeOff} label="Hide interface" onClick={() => setShowChrome(false)} />
+        <IconButton icon={Minus} label="Previous line" onClick={() => moveToLine(activeLine - 1)} />
+        <IconButton icon={Plus} label="Next line" onClick={() => moveToLine(activeLine + 1)} />
+        <IconButton icon={showReadingPanel ? SlidersHorizontal : Settings} label={showReadingPanel ? 'Hide settings' : 'Show settings'} active={showReadingPanel} onClick={() => setShowReadingPanel((current) => !current)} />
       </footer>
       )}
 
-      {showChrome && (
+      {showChrome && !showReadingPanel && (
       <div className="status-strip" role="status" aria-live="polite" aria-label={prompterStatusText}>
         <span className={`status-pill status-${speech.status}`}>
           {settings.voiceFollow ? voiceStatusText(speech.status) : 'Manual voice'}
         </span>
-        <span className="status-pill">{hasMic ? 'Mic active' : 'Mic pending'}</span>
-        <span className="status-pill">Camera {settings.cameraFacing === 'user' ? 'front' : 'rear'}</span>
+        <span className="status-pill">{hasMic ? 'Mic' : 'Mic pending'}</span>
         {countdown > 0 && <span className="status-pill status-countdown">Recording in {countdown}</span>}
-        <span className="status-pill">Zoom {zoomMode}</span>
-        <span className="status-pill">Screen {wakeLockText(wakeLockStatus)}</span>
+        {isRecording && <span className="status-pill status-countdown">{formatDuration(elapsed)}</span>}
         <span className="status-pill" title={__APP_BUILD_INFO__} aria-label={`Version ${__APP_VERSION__}. ${__APP_BUILD_INFO__}`}>
           v{__APP_VERSION__}
         </span>
@@ -1013,6 +977,129 @@ function CameraPane({ videoRef, hasCamera, permission, mediaError, mirror, zoomM
         {cameraFacing === 'user' ? 'Front' : 'Rear'} · {mirror ? 'Mirrored' : 'Normal'} view · {zoom.toFixed(1)}x
       </div>
     </div>
+  )
+}
+
+interface ReadingSettingsSheetProps {
+  settings: PrompterSettings
+  zoomMode: 'hardware' | 'preview'
+  hasCamera: boolean
+  isRecording: boolean
+  countdown: number
+  keepAwake: boolean
+  onClose: () => void
+  onRequestMedia: () => Promise<MediaStream | null>
+  onSettingsChange: (patch: Partial<PrompterSettings>) => void
+  onStopMedia: () => void
+  onToggleKeepAwake: () => void
+}
+
+function ReadingSettingsSheet({
+  settings,
+  zoomMode,
+  hasCamera,
+  isRecording,
+  countdown,
+  keepAwake,
+  onClose,
+  onRequestMedia,
+  onSettingsChange,
+  onStopMedia,
+  onToggleKeepAwake,
+}: ReadingSettingsSheetProps) {
+  const mediaControlsDisabled = isRecording || countdown > 0
+
+  return (
+    <aside className="reading-panel" aria-label="Reading settings">
+      <div className="reading-panel-header">
+        <div>
+          <span>Settings</span>
+          <small>Text, voice, camera</small>
+        </div>
+        <IconButton icon={X} label="Close settings" onClick={onClose} />
+      </div>
+
+      <div className="settings-control-list">
+        <label>
+          <span>
+            <Type aria-hidden="true" size={16} />
+            Text
+          </span>
+          <strong>{settings.fontSize}px</strong>
+          <input type="range" min="22" max="58" value={settings.fontSize} onChange={(event) => onSettingsChange({ fontSize: Number(event.target.value) })} />
+        </label>
+        <label>
+          <span>
+            <SlidersHorizontal aria-hidden="true" size={16} />
+            Speed
+          </span>
+          <strong>{settings.speed.toFixed(1)}x</strong>
+          <input type="range" min="0.5" max="2.5" step="0.1" value={settings.speed} onChange={(event) => onSettingsChange({ speed: Number(event.target.value) })} />
+        </label>
+        <label>
+          <span>
+            <ZoomIn aria-hidden="true" size={16} />
+            Zoom
+          </span>
+          <strong>{settings.zoom.toFixed(1)}x · {zoomMode}</strong>
+          <input type="range" min="1" max="3" step="0.1" value={settings.zoom} onChange={(event) => onSettingsChange({ zoom: Number(event.target.value) })} />
+        </label>
+        <label>
+          <span>
+            <Languages aria-hidden="true" size={16} />
+            Language
+          </span>
+          <select value={settings.language} onChange={(event) => onSettingsChange({ language: event.target.value })}>
+            <option value="es-ES">Español</option>
+            <option value="en-US">English</option>
+            <option value="fr-FR">Français</option>
+            <option value="de-DE">Deutsch</option>
+            <option value="it-IT">Italiano</option>
+            <option value="pt-PT">Português</option>
+          </select>
+        </label>
+      </div>
+
+      <div className="settings-action-grid">
+        <button className={`settings-action ${settings.voiceFollow ? 'is-active' : ''}`} type="button" onClick={() => onSettingsChange({ voiceFollow: !settings.voiceFollow })}>
+          {settings.voiceFollow ? <Mic aria-hidden="true" size={18} /> : <MicOff aria-hidden="true" size={18} />}
+          <span>Voice</span>
+        </button>
+        <button className={`settings-action ${settings.layout === 'split' ? 'is-active' : ''}`} type="button" onClick={() => onSettingsChange({ layout: settings.layout === 'overlay' ? 'split' : 'overlay' })}>
+          <Wand2 aria-hidden="true" size={18} />
+          <span>{settings.layout === 'overlay' ? 'Overlay' : 'Split'}</span>
+        </button>
+        <button className="settings-action" type="button" onClick={() => onSettingsChange({ splitOrder: settings.splitOrder === 'script-first' ? 'camera-first' : 'script-first' })}>
+          <ArrowLeftRight aria-hidden="true" size={18} />
+          <span>Swap</span>
+        </button>
+        <button className={`settings-action ${hasCamera ? 'is-active' : ''}`} type="button" disabled={mediaControlsDisabled} onClick={hasCamera ? onStopMedia : () => void onRequestMedia()}>
+          {hasCamera ? <CameraOff aria-hidden="true" size={18} /> : <Camera aria-hidden="true" size={18} />}
+          <span>{hasCamera ? 'Camera off' : 'Camera'}</span>
+        </button>
+        <button
+          className={`settings-action ${settings.cameraFacing === 'environment' ? 'is-active' : ''}`}
+          type="button"
+          disabled={mediaControlsDisabled}
+          onClick={() => onSettingsChange({ cameraFacing: settings.cameraFacing === 'user' ? 'environment' : 'user' })}
+        >
+          <SwitchCamera aria-hidden="true" size={18} />
+          <span>{settings.cameraFacing === 'user' ? 'Front' : 'Rear'}</span>
+        </button>
+        <button className={`settings-action ${settings.mirror ? 'is-active' : ''}`} type="button" onClick={() => onSettingsChange({ mirror: !settings.mirror })}>
+          <RefreshCcw aria-hidden="true" size={18} />
+          <span>Mirror</span>
+        </button>
+        <button className={`settings-action ${keepAwake ? 'is-active' : ''}`} type="button" onClick={onToggleKeepAwake}>
+          <MonitorUp aria-hidden="true" size={18} />
+          <span>Awake</span>
+        </button>
+        <button className="settings-action" type="button" onClick={() => onSettingsChange({ theme: nextTheme(settings.theme) })}>
+          {settings.theme === 'light' ? <Moon aria-hidden="true" size={18} /> : settings.theme === 'dark' ? <Sun aria-hidden="true" size={18} /> : <Settings aria-hidden="true" size={18} />}
+          <span>Theme</span>
+        </button>
+      </div>
+    </aside>
   )
 }
 
