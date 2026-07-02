@@ -1,6 +1,12 @@
 import type { ScriptItem } from '../types'
 
 const sentenceBreak = /(?<=[.!?])\s+|\n+/g
+const digitWords = ['cero', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve']
+const teenWords = ['diez', 'once', 'doce', 'trece', 'catorce', 'quince', 'dieciseis', 'diecisiete', 'dieciocho', 'diecinueve']
+const twentyWords = ['veinte', 'veintiuno', 'veintidos', 'veintitres', 'veinticuatro', 'veinticinco', 'veintiseis', 'veintisiete', 'veintiocho', 'veintinueve']
+const tensWords = ['', '', '', 'treinta', 'cuarenta', 'cincuenta', 'sesenta', 'setenta', 'ochenta', 'noventa']
+const hundredWords = ['', 'ciento', 'doscientos', 'trescientos', 'cuatrocientos', 'quinientos', 'seiscientos', 'setecientos', 'ochocientos', 'novecientos']
+const numberWordSequencesCache = new Map<string, string[][]>()
 
 export function splitScript(body: string) {
   const chunks = body
@@ -201,18 +207,18 @@ export function findVoiceCursorMatch(lines: string[], transcript: string, cursor
   }
 
   const nearLookaheadWords = getLineBoundedLookahead(words, cursor, Math.max(1, options.lookaheadWords ?? 5))
-  const nearMatch = findSpokenWordInWindow(lines, words, spokenSet, cursor, 0, nearLookaheadWords, options)
+  const nearMatch = findSpokenWordInWindow(lines, words, spokenWords, spokenSet, cursor, 0, nearLookaheadWords, options)
   const recoveryLookaheadWords = getLineBoundedLookahead(words, cursor, Math.max(nearLookaheadWords, options.recoveryLookaheadWords ?? 18))
 
   if (canRecoverSkippedWords(currentProgress) && recoveryLookaheadWords > nearLookaheadWords) {
-    const recoveryMatch = findSpokenWordInWindow(lines, words, spokenSet, cursor, nearLookaheadWords, recoveryLookaheadWords, options, isReliableSkipWord)
+    const recoveryMatch = findSpokenWordInWindow(lines, words, spokenWords, spokenSet, cursor, nearLookaheadWords, recoveryLookaheadWords, options, isReliableSkipWord)
 
     if (recoveryMatch && (!nearMatch || shouldPreferRecoveryMatch(nearMatch, recoveryMatch))) {
       return recoveryMatch
     }
   }
 
-  if (canAdvancePastLastWord(currentProgress)) {
+  if (canAdvanceToNextLine(currentProgress)) {
     const nextLineMatch = findNextLineStartMatch(lines, words, spokenWords, spokenSet, cursor, options)
 
     if (nextLineMatch && (!nearMatch || nextLineMatch.matchedWordCount > nearMatch.matchedWordCount)) {
@@ -236,6 +242,7 @@ export function findVoiceCursorMatch(lines: string[], transcript: string, cursor
 function findSpokenWordInWindow(
   lines: string[],
   words: VoiceWordPosition[],
+  spokenWords: string[],
   spokenSet: Set<string>,
   cursor: number,
   startOffset: number,
@@ -249,7 +256,7 @@ function findSpokenWordInWindow(
   while (scriptIndex < words.length && checkedWords < endOffset) {
     const scriptWord = words[scriptIndex]
 
-    if (spokenSet.has(scriptWord.clean) && canUseWord(scriptWord.clean)) {
+    if (matchesScriptWordInTranscript(scriptWord.clean, spokenWords, spokenSet) && canUseWord(scriptWord.clean)) {
       if (scriptWord.clean === options.lastMatchedWord && checkedWords > 0) {
         scriptIndex += 1
         checkedWords += 1
@@ -312,7 +319,7 @@ function findNextLineStartMatch(
     }
   }
 
-  return findSpokenWordInWindow(lines, words, spokenSet, nextLineStart, 0, lookaheadWords, options, isReliableSkipWord)
+  return findSpokenWordInWindow(lines, words, spokenWords, spokenSet, nextLineStart, 0, lookaheadWords, options, isReliableSkipWord)
 }
 
 function canRecoverSkippedWords(progress: ReturnType<typeof getVoiceCursorProgress>) {
@@ -321,6 +328,10 @@ function canRecoverSkippedWords(progress: ReturnType<typeof getVoiceCursorProgre
 
 function canAdvancePastLastWord(progress: ReturnType<typeof getVoiceCursorProgress>) {
   return progress.wordCount > 0 && progress.matchedWordCount === progress.wordCount - 1
+}
+
+function canAdvanceToNextLine(progress: ReturnType<typeof getVoiceCursorProgress>) {
+  return canAdvancePastLastWord(progress) || progress.matchedWordCount >= 2
 }
 
 function shouldPreferRecoveryMatch(nearMatch: VoiceCursorMatch, recoveryMatch: VoiceCursorMatch) {
@@ -433,7 +444,7 @@ function findNearbySpokenWordEnd(lineWords: string[], spokenWords: string[], cur
   const searchEnd = Math.min(lineWords.length - 1, cursor + 5)
 
   for (let index = cursor; index <= searchEnd; index += 1) {
-    if (spokenSet.has(lineWords[index])) {
+    if (matchesScriptWordInTranscript(lineWords[index], spokenWords, spokenSet)) {
       const matchedEnd = index + 1
 
       if (matchedEnd > cursor && options.maxAdvanceWords !== undefined) {
@@ -449,15 +460,30 @@ function findNearbySpokenWordEnd(lineWords: string[], spokenWords: string[], cur
 
 function countConsecutiveMatches(lineWords: string[], transcriptWords: string[], lineStart: number) {
   let matched = 0
+  let transcriptIndex = 0
 
-  for (const transcriptWord of transcriptWords) {
+  while (transcriptIndex < transcriptWords.length) {
     const lineIndex = lineStart + matched
 
-    if (lineIndex >= lineWords.length || lineWords[lineIndex] !== transcriptWord) {
+    if (lineIndex >= lineWords.length) {
       break
     }
 
-    matched += 1
+    const wordMatchLength = getScriptWordMatchLength(lineWords[lineIndex], transcriptWords, transcriptIndex)
+
+    if (wordMatchLength > 0) {
+      matched += 1
+      transcriptIndex += wordMatchLength
+      continue
+    }
+
+    if (matchesJoinedLineWords(lineWords, lineIndex, transcriptWords[transcriptIndex])) {
+      matched += 2
+      transcriptIndex += 1
+      continue
+    }
+
+    break
   }
 
   return matched
@@ -469,27 +495,156 @@ function shouldAdvanceFromLine(progress: ReturnType<typeof getLineVoiceProgress>
 
 function countOrderedPrefixMatches(lineWords: string[], transcriptWords: string[], startIndex = 0) {
   let matched = startIndex
+  let transcriptIndex = 0
 
-  for (const transcriptWord of transcriptWords) {
+  while (transcriptIndex < transcriptWords.length) {
     if (matched >= lineWords.length) {
       break
     }
 
-    if (matchesLineWord(lineWords, matched, transcriptWord)) {
+    const wordMatchLength = getScriptWordMatchLength(lineWords[matched], transcriptWords, transcriptIndex)
+
+    if (wordMatchLength > 0) {
       matched += 1
+      transcriptIndex += wordMatchLength
       continue
     }
 
-    if (matchesJoinedLineWords(lineWords, matched, transcriptWord)) {
+    if (matchesJoinedLineWords(lineWords, matched, transcriptWords[transcriptIndex])) {
       matched += 2
+      transcriptIndex += 1
+      continue
     }
+
+    transcriptIndex += 1
   }
 
   return matched
 }
 
-function matchesLineWord(lineWords: string[], index: number, transcriptWord: string) {
-  return lineWords[index] === transcriptWord
+function getScriptWordMatchLength(scriptWord: string, transcriptWords: string[], transcriptIndex: number) {
+  if (scriptWord === transcriptWords[transcriptIndex]) {
+    return 1
+  }
+
+  return getNumberWordMatchLength(scriptWord, transcriptWords, transcriptIndex)
+}
+
+function matchesScriptWordInTranscript(scriptWord: string, transcriptWords: string[], transcriptSet: Set<string>) {
+  if (transcriptSet.has(scriptWord)) {
+    return true
+  }
+
+  for (let index = 0; index < transcriptWords.length; index += 1) {
+    if (getNumberWordMatchLength(scriptWord, transcriptWords, index) > 0) {
+      return true
+    }
+  }
+
+  return false
+}
+
+function getNumberWordMatchLength(scriptWord: string, transcriptWords: string[], transcriptIndex: number) {
+  const sequences = getNumberWordSequences(scriptWord)
+
+  for (const sequence of sequences) {
+    if (sequence.length === 0 || transcriptIndex + sequence.length > transcriptWords.length) {
+      continue
+    }
+
+    if (sequence.every((word, offset) => word === transcriptWords[transcriptIndex + offset])) {
+      return sequence.length
+    }
+  }
+
+  return 0
+}
+
+function getNumberWordSequences(scriptWord: string) {
+  if (!/^\d+$/.test(scriptWord)) {
+    return []
+  }
+
+  const cached = numberWordSequencesCache.get(scriptWord)
+
+  if (cached) {
+    return cached
+  }
+
+  const sequences: string[][] = [scriptWord.split('').map((digit) => digitWords[Number(digit)])]
+  const numberValue = Number(scriptWord)
+
+  if (Number.isSafeInteger(numberValue) && numberValue >= 0 && numberValue <= 999_999 && (scriptWord === '0' || !scriptWord.startsWith('0'))) {
+    const cardinalWords = spanishCardinalWords(numberValue)
+
+    if (cardinalWords.length > 0) {
+      sequences.push(cardinalWords)
+
+      const withoutAnd = cardinalWords.filter((word) => word !== 'y')
+
+      if (withoutAnd.length !== cardinalWords.length) {
+        sequences.push(withoutAnd)
+      }
+    }
+  }
+
+  const uniqueSequences = uniqueWordSequences(sequences)
+  numberWordSequencesCache.set(scriptWord, uniqueSequences)
+
+  return uniqueSequences
+}
+
+function spanishCardinalWords(value: number): string[] {
+  if (value < 10) {
+    return [digitWords[value]]
+  }
+
+  if (value < 20) {
+    return [teenWords[value - 10]]
+  }
+
+  if (value < 30) {
+    return [twentyWords[value - 20]]
+  }
+
+  if (value < 100) {
+    const ten = Math.floor(value / 10)
+    const unit = value % 10
+
+    return unit === 0 ? [tensWords[ten]] : [tensWords[ten], 'y', digitWords[unit]]
+  }
+
+  if (value === 100) {
+    return ['cien']
+  }
+
+  if (value < 1000) {
+    const hundred = Math.floor(value / 100)
+    const rest = value % 100
+
+    return rest === 0 ? [hundredWords[hundred]] : [hundredWords[hundred], ...spanishCardinalWords(rest)]
+  }
+
+  const thousands = Math.floor(value / 1000)
+  const rest = value % 1000
+  const thousandWords = thousands === 1 ? ['mil'] : [...spanishCardinalWords(thousands), 'mil']
+
+  return rest === 0 ? thousandWords : [...thousandWords, ...spanishCardinalWords(rest)]
+}
+
+function uniqueWordSequences(sequences: string[][]) {
+  const seen = new Set<string>()
+
+  return sequences.filter((sequence) => {
+    const key = sequence.join(' ')
+
+    if (seen.has(key)) {
+      return false
+    }
+
+    seen.add(key)
+    return true
+  })
 }
 
 function matchesJoinedLineWords(lineWords: string[], index: number, transcriptWord: string) {

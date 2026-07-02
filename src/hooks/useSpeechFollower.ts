@@ -215,7 +215,7 @@ export function useSpeechFollower({
         lastMatchedWord: lastMatchedWordRef.current,
         lookaheadWords: 5,
         recoveryLookaheadWords: 18,
-        spokenWordLimit: 5,
+        spokenWordLimit: 12,
       })
       const cursorProgress = getVoiceCursorProgress(linesRef.current, match.cursorWordIndex)
 

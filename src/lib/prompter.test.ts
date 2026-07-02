@@ -48,6 +48,27 @@ describe('voice progress helpers', () => {
     expect(progress.wordCount).toBe(4)
   })
 
+  it('matches numbers written with digits when spoken as Spanish words', () => {
+    const progress = getLineVoiceProgress('El valor final es 26300.8758.', 'el valor final es veintiseis mil trescientos coma ocho siete cinco ocho')
+
+    expect(progress.matchedWordCount).toBe(6)
+    expect(progress.wordCount).toBe(6)
+  })
+
+  it('moves the voice cursor through numbers spoken as Spanish words', () => {
+    const lines = ['El valor final es 26300.8758.']
+    const spoken = 'veintiseis mil trescientos coma ocho siete cinco ocho'
+    const firstMatch = findVoiceCursorMatch(lines, spoken, 4, { lookaheadWords: 5, spokenWordLimit: 12 })
+    const secondMatch = findVoiceCursorMatch(lines, spoken, firstMatch.cursorWordIndex, { lookaheadWords: 5, spokenWordLimit: 12 })
+
+    expect(firstMatch.matched).toBe(true)
+    expect(firstMatch.cursorWordIndex).toBe(5)
+    expect(firstMatch.matchedWord).toBe('26300')
+    expect(secondMatch.matched).toBe(true)
+    expect(secondMatch.cursorWordIndex).toBe(6)
+    expect(secondMatch.matchedWord).toBe('8758')
+  })
+
   it('advances to the next line after the current line is fully matched', () => {
     const lines = ['First clear sentence', 'Second clear sentence']
     const currentProgress = getLineVoiceProgress(lines[0], 'first clear sentence')
@@ -141,13 +162,23 @@ describe('voice progress helpers', () => {
     expect(match.cursorWordIndex).toBe(4)
   })
 
-  it('does not jump into the next sentence before the current sentence is complete', () => {
+  it('does not jump into the next sentence before the current sentence has enough progress', () => {
     const lines = ['Hoy termino esta frase', 'Siguiente parrafo empieza aqui']
-    const match = findVoiceCursorMatch(lines, 'siguiente parrafo', 2, { lookaheadWords: 5, spokenWordLimit: 5 })
+    const match = findVoiceCursorMatch(lines, 'siguiente parrafo empieza', 1, { lookaheadWords: 5, spokenWordLimit: 5 })
 
     expect(match.matched).toBe(false)
-    expect(match.cursorWordIndex).toBe(2)
+    expect(match.cursorWordIndex).toBe(1)
     expect(match.lineIndex).toBe(0)
+  })
+
+  it('can skip the rest of a sentence when the reader starts the next sentence', () => {
+    const lines = ['en Experimental mediante un enablement package', 'Siguiente parrafo empieza aqui']
+    const match = findVoiceCursorMatch(lines, 'siguiente parrafo empieza', 2, { lookaheadWords: 5, spokenWordLimit: 5 })
+
+    expect(match.matched).toBe(true)
+    expect(match.cursorWordIndex).toBe(9)
+    expect(match.lineIndex).toBe(1)
+    expect(match.matchedWordCount).toBe(3)
   })
 
   it('moves to the next sentence when only the last current word remains and the reader continues', () => {
