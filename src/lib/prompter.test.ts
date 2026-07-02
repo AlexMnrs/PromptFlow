@@ -115,6 +115,32 @@ describe('voice progress helpers', () => {
     expect(match.cursorWordIndex).toBe(0)
   })
 
+  it('recovers within the current sentence when the reader skips words and resumes later', () => {
+    const lines = ['hola me llamo pepito y soy vendedor ambulante local de fruta']
+    const match = findVoiceCursorMatch(lines, 'aqui divago un poco y opino fruta', 4, {
+      lookaheadWords: 5,
+      recoveryLookaheadWords: 12,
+      spokenWordLimit: 5,
+    })
+
+    expect(match.matched).toBe(true)
+    expect(match.cursorWordIndex).toBe(11)
+    expect(match.lineIndex).toBe(0)
+    expect(match.matchedWordCount).toBe(11)
+  })
+
+  it('does not use short filler words for long skip recovery', () => {
+    const lines = ['hola me llamo pepito y soy vendedor ambulante local de fruta']
+    const match = findVoiceCursorMatch(lines, 'hablo un poco de', 4, {
+      lookaheadWords: 5,
+      recoveryLookaheadWords: 12,
+      spokenWordLimit: 5,
+    })
+
+    expect(match.matched).toBe(false)
+    expect(match.cursorWordIndex).toBe(4)
+  })
+
   it('does not jump into the next sentence before the current sentence is complete', () => {
     const lines = ['Hoy termino esta frase', 'Siguiente parrafo empieza aqui']
     const match = findVoiceCursorMatch(lines, 'siguiente parrafo', 2, { lookaheadWords: 5, spokenWordLimit: 5 })

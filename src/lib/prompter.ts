@@ -47,6 +47,7 @@ interface VoiceWordPosition {
 interface VoiceCursorMatchOptions {
   lastMatchedWord?: string
   lookaheadWords?: number
+  recoveryLookaheadWords?: number
   spokenWordLimit?: number
 }
 
@@ -199,14 +200,48 @@ export function findVoiceCursorMatch(lines: string[], transcript: string, cursor
     }
   }
 
-  let scriptIndex = cursor
-  let checkedWords = 0
-  const lookaheadWords = getLineBoundedLookahead(words, cursor, Math.max(1, options.lookaheadWords ?? 5))
+  const nearLookaheadWords = getLineBoundedLookahead(words, cursor, Math.max(1, options.lookaheadWords ?? 5))
+  const nearMatch = findSpokenWordInWindow(lines, words, spokenSet, cursor, 0, nearLookaheadWords, options)
+  const recoveryLookaheadWords = getLineBoundedLookahead(words, cursor, Math.max(nearLookaheadWords, options.recoveryLookaheadWords ?? 18))
 
-  while (scriptIndex < words.length && checkedWords < lookaheadWords) {
+  if (canRecoverSkippedWords(currentProgress) && recoveryLookaheadWords > nearLookaheadWords) {
+    const recoveryMatch = findSpokenWordInWindow(lines, words, spokenSet, cursor, nearLookaheadWords, recoveryLookaheadWords, options, isReliableSkipWord)
+
+    if (recoveryMatch && (!nearMatch || shouldPreferRecoveryMatch(nearMatch, recoveryMatch))) {
+      return recoveryMatch
+    }
+  }
+
+  if (nearMatch) {
+    return nearMatch
+  }
+
+  return {
+    cursorWordIndex,
+    lineIndex: currentProgress.lineIndex,
+    matched: false,
+    matchedWord: '',
+    matchedWordCount: currentProgress.matchedWordCount,
+  }
+}
+
+function findSpokenWordInWindow(
+  lines: string[],
+  words: VoiceWordPosition[],
+  spokenSet: Set<string>,
+  cursor: number,
+  startOffset: number,
+  endOffset: number,
+  options: VoiceCursorMatchOptions,
+  canUseWord: (word: string) => boolean = () => true,
+) {
+  let checkedWords = startOffset
+  let scriptIndex = cursor + startOffset
+
+  while (scriptIndex < words.length && checkedWords < endOffset) {
     const scriptWord = words[scriptIndex]
 
-    if (spokenSet.has(scriptWord.clean)) {
+    if (spokenSet.has(scriptWord.clean) && canUseWord(scriptWord.clean)) {
       if (scriptWord.clean === options.lastMatchedWord && checkedWords > 0) {
         scriptIndex += 1
         checkedWords += 1
@@ -229,13 +264,20 @@ export function findVoiceCursorMatch(lines: string[], transcript: string, cursor
     checkedWords += 1
   }
 
-  return {
-    cursorWordIndex,
-    lineIndex: currentProgress.lineIndex,
-    matched: false,
-    matchedWord: '',
-    matchedWordCount: currentProgress.matchedWordCount,
-  }
+  return null
+}
+
+function canRecoverSkippedWords(progress: ReturnType<typeof getVoiceCursorProgress>) {
+  return progress.matchedWordCount > 0 && progress.matchedWordCount < progress.wordCount
+}
+
+function shouldPreferRecoveryMatch(nearMatch: VoiceCursorMatch, recoveryMatch: VoiceCursorMatch) {
+  return !isReliableSkipWord(nearMatch.matchedWord) && isReliableSkipWord(recoveryMatch.matchedWord)
+}
+
+function isReliableSkipWord(word: string) {
+  // Far skips need a stronger anchor than short filler words to avoid accidental jumps.
+  return word.length >= 5
 }
 
 function getLineBoundedLookahead(words: VoiceWordPosition[], cursor: number, lookaheadWords: number) {
