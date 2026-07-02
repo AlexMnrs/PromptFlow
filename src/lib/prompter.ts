@@ -212,6 +212,14 @@ export function findVoiceCursorMatch(lines: string[], transcript: string, cursor
     }
   }
 
+  if (canAdvancePastLastWord(currentProgress)) {
+    const nextLineMatch = findNextLineStartMatch(lines, words, spokenWords, spokenSet, cursor, options)
+
+    if (nextLineMatch && (!nearMatch || nextLineMatch.matchedWordCount > nearMatch.matchedWordCount)) {
+      return nextLineMatch
+    }
+  }
+
   if (nearMatch) {
     return nearMatch
   }
@@ -267,12 +275,60 @@ function findSpokenWordInWindow(
   return null
 }
 
+function findNextLineStartMatch(
+  lines: string[],
+  words: VoiceWordPosition[],
+  spokenWords: string[],
+  spokenSet: Set<string>,
+  cursor: number,
+  options: VoiceCursorMatchOptions,
+) {
+  const currentWord = words[cursor]
+
+  if (!currentWord) {
+    return null
+  }
+
+  const nextLineStart = words.findIndex((word, index) => index > cursor && word.lineIndex === currentWord.lineIndex + 1)
+
+  if (nextLineStart < 0) {
+    return null
+  }
+
+  const lookaheadWords = getLineBoundedLookahead(words, nextLineStart, Math.max(1, options.lookaheadWords ?? 5))
+  const nextLineWords = words.slice(nextLineStart, nextLineStart + lookaheadWords).map((word) => word.clean)
+  const prefixMatchCount = countOrderedPrefixMatches(nextLineWords, spokenWords)
+
+  if (isReliableNextLinePrefix(nextLineWords, prefixMatchCount)) {
+    const nextCursor = nextLineStart + prefixMatchCount
+    const nextProgress = getVoiceCursorProgress(lines, nextCursor)
+
+    return {
+      cursorWordIndex: nextCursor,
+      lineIndex: nextProgress.lineIndex,
+      matched: true,
+      matchedWord: nextLineWords[prefixMatchCount - 1],
+      matchedWordCount: nextProgress.matchedWordCount,
+    }
+  }
+
+  return findSpokenWordInWindow(lines, words, spokenSet, nextLineStart, 0, lookaheadWords, options, isReliableSkipWord)
+}
+
 function canRecoverSkippedWords(progress: ReturnType<typeof getVoiceCursorProgress>) {
   return progress.matchedWordCount > 0 && progress.matchedWordCount < progress.wordCount
 }
 
+function canAdvancePastLastWord(progress: ReturnType<typeof getVoiceCursorProgress>) {
+  return progress.wordCount > 0 && progress.matchedWordCount === progress.wordCount - 1
+}
+
 function shouldPreferRecoveryMatch(nearMatch: VoiceCursorMatch, recoveryMatch: VoiceCursorMatch) {
   return !isReliableSkipWord(nearMatch.matchedWord) && isReliableSkipWord(recoveryMatch.matchedWord)
+}
+
+function isReliableNextLinePrefix(words: string[], matchedWordCount: number) {
+  return matchedWordCount >= 2 || (matchedWordCount === 1 && isReliableSkipWord(words[0]))
 }
 
 function isReliableSkipWord(word: string) {

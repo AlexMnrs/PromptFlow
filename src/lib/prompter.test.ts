@@ -150,6 +150,16 @@ describe('voice progress helpers', () => {
     expect(match.lineIndex).toBe(0)
   })
 
+  it('moves to the next sentence when only the last current word remains and the reader continues', () => {
+    const lines = ['Hoy termino esta frase real', 'Siguiente parrafo empieza aqui']
+    const match = findVoiceCursorMatch(lines, 'siguiente parrafo empieza', 4, { lookaheadWords: 5, spokenWordLimit: 5 })
+
+    expect(match.matched).toBe(true)
+    expect(match.cursorWordIndex).toBe(8)
+    expect(match.lineIndex).toBe(1)
+    expect(match.matchedWordCount).toBe(3)
+  })
+
   it('can enter the next sentence once the cursor is already there', () => {
     const lines = ['Hoy termino esta frase', 'Siguiente parrafo empieza aqui']
     const nextLineCursor = getVoiceCursorForLine(lines, 1)
