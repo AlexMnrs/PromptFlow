@@ -1111,57 +1111,63 @@ interface ScriptPaneProps {
 }
 
 function ScriptPane({ lines, activeLine, matchedWordCount, onLineSelect }: ScriptPaneProps) {
+  const paneRef = useRef<HTMLDivElement | null>(null)
   const trackRef = useRef<HTMLDivElement | null>(null)
+  const activeAnchorRef = useRef<HTMLDivElement | null>(null)
   const lineRefs = useRef<Array<HTMLButtonElement | null>>([])
   const currentWordRef = useRef<HTMLSpanElement | null>(null)
-  const [activeLineOffset, setActiveLineOffset] = useState(0)
   const activeVoiceProgress = useMemo(
     () => getLineVoiceProgress(lines[activeLine] ?? '', '', { fixedMatchedWordCount: matchedWordCount }),
     [activeLine, lines, matchedWordCount],
   )
-  const measureActiveLine = useCallback(() => {
+  const scrollActiveLineIntoPosition = useCallback(() => {
+    const paneElement = paneRef.current
+    const anchorElement = activeAnchorRef.current
     const lineElement = lineRefs.current[activeLine]
 
-    if (!lineElement) {
-      setActiveLineOffset(0)
+    if (!paneElement || !anchorElement || !lineElement) {
       return
     }
 
+    const paneRect = paneElement.getBoundingClientRect()
+    const lineRect = lineElement.getBoundingClientRect()
     const wordElement = currentWordRef.current
     const wordOffset =
       wordElement && lineElement.contains(wordElement) ? Math.max(0, wordElement.getBoundingClientRect().top - lineElement.getBoundingClientRect().top) : 0
+    const activeTop = lineRect.top - paneRect.top + paneElement.scrollTop + wordOffset
+    const maxScrollTop = Math.max(0, paneElement.scrollHeight - paneElement.clientHeight)
+    const nextScrollTop = clamp(activeTop - anchorElement.offsetTop, 0, maxScrollTop)
 
-    setActiveLineOffset(lineElement.offsetTop + wordOffset)
+    if (Math.abs(paneElement.scrollTop - nextScrollTop) < 1) {
+      return
+    }
+
+    paneElement.scrollTop = nextScrollTop
   }, [activeLine])
 
   useLayoutEffect(() => {
-    measureActiveLine()
-  }, [lines, matchedWordCount, measureActiveLine])
+    scrollActiveLineIntoPosition()
+  }, [lines, matchedWordCount, scrollActiveLineIntoPosition])
 
   useEffect(() => {
+    const pane = paneRef.current
     const track = trackRef.current
 
-    if (!track || !window.ResizeObserver) {
+    if (!pane || !track || !window.ResizeObserver) {
       return undefined
     }
 
-    const observer = new ResizeObserver(measureActiveLine)
+    const observer = new ResizeObserver(scrollActiveLineIntoPosition)
+    observer.observe(pane)
     observer.observe(track)
 
     return () => observer.disconnect()
-  }, [lines, measureActiveLine])
+  }, [lines, scrollActiveLineIntoPosition])
 
   return (
-    <div className="script-pane" aria-label="Prompter text">
-      <div
-        ref={trackRef}
-        className="script-track"
-        style={
-          {
-            '--active-line-offset': `${activeLineOffset}px`,
-          } as React.CSSProperties
-        }
-      >
+    <div ref={paneRef} className="script-pane" aria-label="Prompter text">
+      <div ref={activeAnchorRef} className="script-active-anchor" aria-hidden="true" />
+      <div ref={trackRef} className="script-track">
         {lines.map((line, index) => (
           <button
             key={`${line}-${index}`}

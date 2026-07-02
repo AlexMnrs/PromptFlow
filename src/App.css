@@ -616,6 +616,25 @@
 .script-pane {
   color: white;
   --active-offset: clamp(178px, 36svh, 300px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
+.script-pane::-webkit-scrollbar {
+  display: none;
+}
+
+.script-active-anchor {
+  position: absolute;
+  top: var(--active-offset);
+  left: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
 }
 
 .layout-overlay .script-pane::before,
@@ -644,7 +663,7 @@
   position: absolute;
   inset: 0;
   z-index: 5;
-  pointer-events: none;
+  pointer-events: auto;
   background: linear-gradient(180deg, transparent 14%, rgba(0, 0, 0, var(--overlay-opacity)) 40%, rgba(0, 0, 0, 0.72) 84%, rgba(0, 0, 0, 0.88));
 }
 
@@ -680,9 +699,6 @@
   width: min(var(--prompter-text-width), 980px);
   margin: 0 auto;
   padding: 30svh 18px 54svh;
-  transform: translateY(calc(var(--active-offset) - var(--active-line-offset, 0px)));
-  transition: transform 220ms ease;
-  will-change: transform;
 }
 
 .script-line {
