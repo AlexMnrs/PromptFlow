@@ -150,6 +150,18 @@ describe('voice progress helpers', () => {
     expect(match.matchedWordCount).toBe(11)
   })
 
+  it('does not recover to a far word from stale speech when the reader has moved on', () => {
+    const lines = ['hola me llamo pepito y soy vendedor ambulante local de fruta']
+    const match = findVoiceCursorMatch(lines, 'fruta fue una referencia pero sigo hablando', 4, {
+      lookaheadWords: 5,
+      recoveryLookaheadWords: 12,
+      spokenWordLimit: 8,
+    })
+
+    expect(match.matched).toBe(false)
+    expect(match.cursorWordIndex).toBe(4)
+  })
+
   it('does not use short filler words for long skip recovery', () => {
     const lines = ['hola me llamo pepito y soy vendedor ambulante local de fruta']
     const match = findVoiceCursorMatch(lines, 'hablo un poco de', 4, {
@@ -179,6 +191,15 @@ describe('voice progress helpers', () => {
     expect(match.cursorWordIndex).toBe(9)
     expect(match.lineIndex).toBe(1)
     expect(match.matchedWordCount).toBe(3)
+  })
+
+  it('does not skip to the next sentence from stale next-sentence words', () => {
+    const lines = ['en Experimental mediante un enablement package', 'Siguiente parrafo empieza aqui']
+    const match = findVoiceCursorMatch(lines, 'siguiente parrafo empieza pero sigo en experimental', 2, { lookaheadWords: 5, spokenWordLimit: 7 })
+
+    expect(match.matched).toBe(false)
+    expect(match.cursorWordIndex).toBe(2)
+    expect(match.lineIndex).toBe(0)
   })
 
   it('moves to the next sentence when only the last current word remains and the reader continues', () => {

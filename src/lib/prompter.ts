@@ -211,7 +211,17 @@ export function findVoiceCursorMatch(lines: string[], transcript: string, cursor
   const recoveryLookaheadWords = getLineBoundedLookahead(words, cursor, Math.max(nearLookaheadWords, options.recoveryLookaheadWords ?? 18))
 
   if (canRecoverSkippedWords(currentProgress) && recoveryLookaheadWords > nearLookaheadWords) {
-    const recoveryMatch = findSpokenWordInWindow(lines, words, spokenWords, spokenSet, cursor, nearLookaheadWords, recoveryLookaheadWords, options, isReliableSkipWord)
+    const recoveryMatch = findSpokenWordInWindow(
+      lines,
+      words,
+      spokenWords,
+      spokenSet,
+      cursor,
+      nearLookaheadWords,
+      recoveryLookaheadWords,
+      options,
+      (word) => isReliableSkipWord(word) && matchesScriptWordInRecentTranscript(word, spokenWords),
+    )
 
     if (recoveryMatch && (!nearMatch || shouldPreferRecoveryMatch(nearMatch, recoveryMatch))) {
       return recoveryMatch
@@ -304,7 +314,7 @@ function findNextLineStartMatch(
 
   const lookaheadWords = getLineBoundedLookahead(words, nextLineStart, Math.max(1, options.lookaheadWords ?? 5))
   const nextLineWords = words.slice(nextLineStart, nextLineStart + lookaheadWords).map((word) => word.clean)
-  const prefixMatchCount = countOrderedPrefixMatches(nextLineWords, spokenWords)
+  const prefixMatchCount = countRecentLinePrefixMatches(nextLineWords, spokenWords)
 
   if (isReliableNextLinePrefix(nextLineWords, prefixMatchCount)) {
     const nextCursor = nextLineStart + prefixMatchCount
@@ -319,7 +329,7 @@ function findNextLineStartMatch(
     }
   }
 
-  return findSpokenWordInWindow(lines, words, spokenWords, spokenSet, nextLineStart, 0, lookaheadWords, options, isReliableSkipWord)
+  return findSpokenWordInWindow(lines, words, spokenWords, spokenSet, nextLineStart, 0, lookaheadWords, options, (word) => isReliableSkipWord(word) && matchesScriptWordInRecentTranscript(word, spokenWords))
 }
 
 function canRecoverSkippedWords(progress: ReturnType<typeof getVoiceCursorProgress>) {
@@ -522,6 +532,48 @@ function countOrderedPrefixMatches(lineWords: string[], transcriptWords: string[
   return matched
 }
 
+function countRecentLinePrefixMatches(lineWords: string[], transcriptWords: string[]) {
+  let bestMatchCount = 0
+
+  for (let transcriptStart = 0; transcriptStart < transcriptWords.length; transcriptStart += 1) {
+    const { consumedWordCount, matchedWordCount } = countLinePrefixMatchFromTranscript(lineWords, transcriptWords, transcriptStart)
+
+    if (matchedWordCount > bestMatchCount && transcriptStart + consumedWordCount >= transcriptWords.length) {
+      bestMatchCount = matchedWordCount
+    }
+  }
+
+  return bestMatchCount
+}
+
+function countLinePrefixMatchFromTranscript(lineWords: string[], transcriptWords: string[], transcriptStart: number) {
+  let matchedWordCount = 0
+  let transcriptIndex = transcriptStart
+
+  while (transcriptIndex < transcriptWords.length && matchedWordCount < lineWords.length) {
+    const wordMatchLength = getScriptWordMatchLength(lineWords[matchedWordCount], transcriptWords, transcriptIndex)
+
+    if (wordMatchLength > 0) {
+      matchedWordCount += 1
+      transcriptIndex += wordMatchLength
+      continue
+    }
+
+    if (matchesJoinedLineWords(lineWords, matchedWordCount, transcriptWords[transcriptIndex])) {
+      matchedWordCount += 2
+      transcriptIndex += 1
+      continue
+    }
+
+    break
+  }
+
+  return {
+    consumedWordCount: transcriptIndex - transcriptStart,
+    matchedWordCount,
+  }
+}
+
 function getScriptWordMatchLength(scriptWord: string, transcriptWords: string[], transcriptIndex: number) {
   if (scriptWord === transcriptWords[transcriptIndex]) {
     return 1
@@ -542,6 +594,11 @@ function matchesScriptWordInTranscript(scriptWord: string, transcriptWords: stri
   }
 
   return false
+}
+
+function matchesScriptWordInRecentTranscript(scriptWord: string, transcriptWords: string[], recentWordLimit = 4) {
+  const recentWords = transcriptWords.slice(-recentWordLimit)
+  return matchesScriptWordInTranscript(scriptWord, recentWords, new Set(recentWords))
 }
 
 function getNumberWordMatchLength(scriptWord: string, transcriptWords: string[], transcriptIndex: number) {
